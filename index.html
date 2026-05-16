@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Workout">
+  <title>Workout</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ─────────────────────────── Home ─────────────────────────── -->
+<section data-screen="home" hidden>
+  <header class="app-header">
+    <h1>Workout</h1>
+  </header>
+  <div data-banner="resume" class="banner banner-resume" hidden></div>
+  <div data-banner="backup" class="banner banner-backup" hidden></div>
+  <main>
+    <ul data-list="workouts" class="workout-list"></ul>
+    <div class="empty-state" data-empty="workouts" hidden>
+      <p>No workouts yet.</p>
+      <button class="btn btn-secondary" data-go="settings">+ Import a workout</button>
+    </div>
+    <button class="btn btn-link" data-go="settings">+ Import workout (paste JSON)</button>
+  </main>
+  <footer class="app-footer">
+    <button class="btn btn-link" data-go="history">History</button>
+    <span class="dot">·</span>
+    <button class="btn btn-link" data-go="settings">Settings</button>
+  </footer>
+</section>
+
+<!-- ─────────────────────────── Workout Detail ─────────────────────────── -->
+<section data-screen="detail" hidden>
+  <header class="app-header">
+    <button class="btn btn-icon" data-back aria-label="Back">‹</button>
+    <h2 data-field="detail-name"></h2>
+    <button class="btn btn-icon btn-danger" data-action="delete-workout" aria-label="Delete">🗑</button>
+  </header>
+  <main>
+    <p class="subtitle"><span data-field="detail-meta"></span></p>
+    <ul data-list="detail-exercises" class="exercise-list"></ul>
+    <div class="lockdown-reminder">
+      <strong>After tapping Start:</strong> triple-click the side button to enable Guided Access.
+    </div>
+    <button class="btn btn-primary btn-large" data-action="start-workout">Start workout</button>
+  </main>
+</section>
+
+<!-- ─────────────────────────── Active Set ─────────────────────────── -->
+<section data-screen="active" hidden>
+  <header class="app-header app-header-compact">
+    <div class="progress-chip" data-field="active-chip"></div>
+    <button class="btn btn-link btn-danger" data-action="end-workout">End</button>
+  </header>
+  <main class="active-main">
+    <h2 class="exercise-name" data-field="active-name"></h2>
+
+    <div class="active-card">
+      <div class="active-cell" data-cell="reps">
+        <div class="active-value" data-field="active-reps"></div>
+        <div class="active-label">REPS</div>
+        <button class="btn-pencil" data-action="edit-reps" aria-label="Edit reps">✎</button>
+      </div>
+      <div class="active-cell" data-cell="weight">
+        <div class="active-value" data-field="active-weight"></div>
+        <div class="active-label" data-field="active-weight-unit">LB</div>
+        <button class="btn-pencil" data-action="edit-weight" aria-label="Edit weight">✎</button>
+      </div>
+    </div>
+
+    <div class="notes-panel" data-field="active-notes" hidden></div>
+
+    <div class="last-time" data-field="active-last" hidden></div>
+
+    <button class="btn btn-primary btn-large btn-hold" data-action="set-done">
+      <span class="btn-hold-fill"></span>
+      <span class="btn-hold-label">SET DONE</span>
+    </button>
+  </main>
+</section>
+
+<!-- ─────────────────────────── Rest ─────────────────────────── -->
+<section data-screen="rest" hidden>
+  <header class="app-header app-header-compact">
+    <div class="progress-chip" data-field="rest-chip"></div>
+    <button class="btn btn-link btn-danger" data-action="end-workout">End</button>
+  </header>
+  <main class="rest-main">
+    <div class="rest-label">REST</div>
+    <div class="rest-countdown" data-field="rest-countdown">0:00</div>
+    <div class="rest-next" data-field="rest-next"></div>
+
+    <button class="btn btn-primary btn-large" data-action="skip-rest">Skip rest</button>
+    <button class="btn btn-secondary" data-action="undo-set">Undo last set</button>
+  </main>
+</section>
+
+<!-- ─────────────────────────── Workout Done ─────────────────────────── -->
+<section data-screen="done" hidden>
+  <header class="app-header"><h2>Workout complete</h2></header>
+  <main>
+    <p class="done-summary" data-field="done-summary"></p>
+    <ul data-list="done-log" class="done-log"></ul>
+    <button class="btn btn-primary btn-large" data-go="home">Back to home</button>
+  </main>
+</section>
+
+<!-- ─────────────────────────── History ─────────────────────────── -->
+<section data-screen="history" hidden>
+  <header class="app-header">
+    <button class="btn btn-icon" data-back aria-label="Back">‹</button>
+    <h2>History</h2>
+  </header>
+  <main>
+    <ul data-list="history" class="history-list"></ul>
+    <p class="empty-state" data-empty="history" hidden>No completed workouts yet.</p>
+  </main>
+</section>
+
+<!-- ─────────────────────────── Settings ─────────────────────────── -->
+<section data-screen="settings" hidden>
+  <header class="app-header">
+    <button class="btn btn-icon" data-back aria-label="Back">‹</button>
+    <h2>Settings</h2>
+  </header>
+  <main>
+    <section class="settings-block">
+      <h3>Import workout</h3>
+      <p class="subtitle">Paste a workout JSON below.</p>
+      <textarea data-field="import-workout-textarea" rows="10" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off"></textarea>
+      <div class="row-buttons">
+        <button class="btn btn-secondary" data-action="import-workout-validate">Validate</button>
+        <button class="btn btn-primary" data-action="import-workout-commit" disabled>Import</button>
+      </div>
+      <div class="validate-output" data-field="import-workout-output"></div>
+    </section>
+
+    <section class="settings-block">
+      <h3>Export all data</h3>
+      <p class="subtitle">Copy this blob somewhere safe. It contains every workout in your library and your full history.</p>
+      <textarea data-field="export-textarea" rows="6" readonly spellcheck="false"></textarea>
+      <button class="btn btn-primary" data-action="export-copy">Copy to clipboard</button>
+      <div class="status-line" data-field="export-status"></div>
+    </section>
+
+    <section class="settings-block">
+      <h3>Import all data</h3>
+      <p class="subtitle"><strong>This will overwrite</strong> your library and history. The previous version is kept for one-tap undo.</p>
+      <textarea data-field="import-all-textarea" rows="6" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off"></textarea>
+      <div class="row-buttons">
+        <button class="btn btn-secondary" data-action="import-all-validate">Validate</button>
+        <button class="btn btn-danger" data-action="import-all-commit" disabled>Overwrite</button>
+        <button class="btn btn-secondary" data-action="import-all-undo" hidden>Undo</button>
+      </div>
+      <div class="validate-output" data-field="import-all-output"></div>
+    </section>
+
+    <section class="settings-block">
+      <h3>About</h3>
+      <p class="subtitle" data-field="about-info"></p>
+    </section>
+  </main>
+</section>
+
+<!-- ─────────────────────────── Modals ─────────────────────────── -->
+<div class="modal-backdrop" data-modal="keypad" hidden>
+  <div class="modal modal-keypad">
+    <div class="keypad-display" data-field="keypad-display"></div>
+    <div class="keypad-label" data-field="keypad-label"></div>
+    <div class="keypad-grid">
+      <button class="keypad-key" data-key="1">1</button>
+      <button class="keypad-key" data-key="2">2</button>
+      <button class="keypad-key" data-key="3">3</button>
+      <button class="keypad-key" data-key="4">4</button>
+      <button class="keypad-key" data-key="5">5</button>
+      <button class="keypad-key" data-key="6">6</button>
+      <button class="keypad-key" data-key="7">7</button>
+      <button class="keypad-key" data-key="8">8</button>
+      <button class="keypad-key" data-key="9">9</button>
+      <button class="keypad-key keypad-key-dot" data-key=".">.</button>
+      <button class="keypad-key" data-key="0">0</button>
+      <button class="keypad-key keypad-key-back" data-key="back">⌫</button>
+    </div>
+    <div class="keypad-actions">
+      <button class="btn btn-secondary" data-action="keypad-cancel">Cancel</button>
+      <button class="btn btn-primary" data-action="keypad-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" data-modal="confirm" hidden>
+  <div class="modal modal-confirm">
+    <p data-field="confirm-message"></p>
+    <div class="row-buttons">
+      <button class="btn btn-secondary" data-action="confirm-cancel">Cancel</button>
+      <button class="btn btn-danger" data-action="confirm-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

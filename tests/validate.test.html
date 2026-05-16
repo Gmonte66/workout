@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Validate tests</title>
+  <style>
+    body { font-family: ui-monospace, monospace; background: #111; color: #ddd; padding: 20px; }
+    .pass { color: #10b981; }
+    .fail { color: #ef4444; }
+    pre { background: #1a1a1a; padding: 8px 12px; border-radius: 6px; overflow-x: auto; font-size: 12px; }
+    h2 { color: #fff; margin-top: 24px; }
+    summary { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Workout JSON Validator — Tests</h1>
+  <div id="summary"></div>
+  <div id="results"></div>
+
+  <script src="../app.js"></script>
+  <script>
+    const v = window.__workout.validateWorkout;
+    const e = window.__workout.validateExportBlob;
+
+    const cases = [
+      // ───── workout: valid ─────
+      ['valid minimal workout', () => v({
+        version: 1, id: 'a', name: 'A',
+        exercises: [{ id: 'x', name: 'X', sets: 3, reps: 10 }],
+      }).length === 0],
+      ['valid full workout', () => v({
+        version: 1, id: 'a', name: 'A', unit: 'kg',
+        exercises: [
+          { id: 'x', name: 'X', sets: 3, reps: 10, weight: 100, rest: 60, notes: 'foo' },
+          { id: 'y', name: 'Y', sets: 2, reps: 8 },
+        ],
+      }).length === 0],
+
+      // ───── workout: invalid top-level ─────
+      ['rejects non-object', () => v(null).length > 0],
+      ['rejects array top-level', () => v([]).length > 0],
+      ['rejects wrong version', () => v({ version: 2, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1 }] }).length > 0],
+      ['rejects empty id', () => v({ version: 1, id: '', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1 }] }).length > 0],
+      ['rejects empty name', () => v({ version: 1, id: 'a', name: '', exercises: [{ id:'x', name:'X', sets:1, reps:1 }] }).length > 0],
+      ['rejects bad unit', () => v({ version: 1, id: 'a', name: 'A', unit: 'oz', exercises: [{ id:'x', name:'X', sets:1, reps:1 }] }).length > 0],
+      ['rejects empty exercises', () => v({ version: 1, id: 'a', name: 'A', exercises: [] }).length > 0],
+
+      // ───── workout: invalid exercise ─────
+      ['rejects exercise missing id', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ name:'X', sets:1, reps:1 }] }).length > 0],
+      ['rejects exercise missing name', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', sets:1, reps:1 }] }).length > 0],
+      ['rejects zero sets', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:0, reps:1 }] }).length > 0],
+      ['rejects negative reps', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:-1 }] }).length > 0],
+      ['rejects float sets', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1.5, reps:1 }] }).length > 0],
+      ['rejects negative weight', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, weight:-1 }] }).length > 0],
+      ['rejects non-string notes', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, notes: 123 }] }).length > 0],
+      ['rejects duplicate exercise ids', () => v({ version: 1, id: 'a', name: 'A', exercises: [
+        { id:'x', name:'X', sets:1, reps:1 },
+        { id:'x', name:'Y', sets:1, reps:1 },
+      ] }).length > 0],
+
+      // ───── export blob ─────
+      ['valid empty export blob', () => e({ schema: 1, exportedAt: 0, library: {}, history: [] }).length === 0],
+      ['valid populated export blob', () => e({
+        schema: 1, exportedAt: 0,
+        library: { 'a': { version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1 }] } },
+        history: [{ workoutId: 'a', workoutName: 'A', startedAt: 1, finishedAt: 2, setsLog: [] }],
+      }).length === 0],
+      ['rejects export with wrong schema', () => e({ schema: 2, exportedAt: 0, library: {}, history: [] }).length > 0],
+      ['rejects export with array library', () => e({ schema: 1, library: [], history: [] }).length > 0],
+      ['rejects export with bad nested workout', () => e({
+        schema: 1, library: { 'a': { version: 1, id: 'a', name: 'A', exercises: [] } }, history: [],
+      }).length > 0],
+    ];
+
+    let pass = 0, fail = 0;
+    const results = document.getElementById('results');
+    cases.forEach(([label, fn]) => {
+      let ok = false; let err = null;
+      try { ok = !!fn(); } catch (e) { err = e; }
+      if (ok) { pass++; results.insertAdjacentHTML('beforeend', `<div class="pass">PASS · ${label}</div>`); }
+      else {
+        fail++;
+        results.insertAdjacentHTML('beforeend', `<div class="fail">FAIL · ${label}${err ? ' · ' + err.message : ''}</div>`);
+      }
+    });
+    document.getElementById('summary').innerHTML =
+      `<h2><span class="pass">${pass} pass</span> · <span class="${fail ? 'fail' : 'pass'}">${fail} fail</span> · ${cases.length} total</h2>`;
+  </script>
+</body>
+</html>
