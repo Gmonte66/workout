@@ -20,7 +20,9 @@ button {
 }
 textarea {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", monospace;
-  font-size: 13px;
+  /* 16px floor prevents iOS Safari from auto-zooming the viewport on focus. */
+  font-size: 16px;
+  line-height: 1.4;
   width: 100%;
   background: #1a1a1a;
   color: #fff;
@@ -52,7 +54,9 @@ section[data-screen][hidden] { display: none; }
   min-height: 48px;
 }
 .app-header h1, .app-header h2 { font-size: 22px; font-weight: 700; flex: 1; }
-.app-header-compact { padding: 12px 16px; }
+.app-header-compact {
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 16px 8px;
+}
 .app-footer {
   display: flex;
   align-items: center;
@@ -89,7 +93,13 @@ section[data-screen][hidden] { display: none; }
 .btn-hold {
   position: relative;
   overflow: hidden;
-  background: #0e8a64;
+  background: #066b4d;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.btn-hold.holding {
+  box-shadow: 0 0 0 2px #34d399 inset;
 }
 .btn-hold.holding .btn-hold-fill {
   width: 100%;
@@ -99,7 +109,7 @@ section[data-screen][hidden] { display: none; }
   position: absolute;
   left: 0; top: 0; bottom: 0;
   width: 0;
-  background: #10b981;
+  background: #34d399;
 }
 .btn-hold-label { position: relative; z-index: 1; }
 
@@ -164,7 +174,8 @@ section[data-screen][hidden] { display: none; }
   color: #888;
   font-weight: 500;
 }
-.active-main { padding: 24px 20px; display: flex; flex-direction: column; }
+.active-main { padding: 24px 20px; display: flex; flex-direction: column; min-height: 0; }
+.active-main .btn-hold { margin-top: auto; }
 .exercise-name { font-size: 26px; font-weight: 700; line-height: 1.15; margin-bottom: 20px; }
 .active-card {
   display: flex;
@@ -188,20 +199,25 @@ section[data-screen][hidden] { display: none; }
 }
 .active-value.placeholder { color: #555; font-size: 36px; padding-top: 14px; }
 .active-label {
-  font-size: 11px;
-  color: #666;
+  font-size: 12px;
+  color: #999;
   letter-spacing: 1.5px;
   margin-top: 8px;
-  font-weight: 500;
+  font-weight: 600;
 }
 .btn-pencil {
   position: absolute;
-  top: 0;
-  right: 0;
-  padding: 8px 10px;
-  color: #666;
-  font-size: 14px;
+  top: 4px;
+  right: 4px;
+  padding: 8px 12px;
+  color: #888;
+  font-size: 16px;
+  min-height: 36px;
+  min-width: 36px;
+  border-radius: 8px;
+  background: #2a2a2a;
 }
+.btn-pencil:active { background: #333; color: #fff; }
 .notes-panel {
   background: #1a1a1a;
   border-radius: 12px;

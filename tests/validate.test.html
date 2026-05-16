@@ -17,7 +17,7 @@
   <div id="summary"></div>
   <div id="results"></div>
 
-  <script src="../app.js"></script>
+  <script>document.write('<script src="../app.js?t=' + Date.now() + '"><\/script>');</script>
   <script>
     const v = window.__workout.validateWorkout;
     const e = window.__workout.validateExportBlob;
@@ -57,6 +57,15 @@
         { id:'x', name:'X', sets:1, reps:1 },
         { id:'x', name:'Y', sets:1, reps:1 },
       ] }).length > 0],
+
+      // ───── workout: bounds ─────
+      ['rejects too many sets', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:51, reps:1 }] }).length > 0],
+      ['accepts exactly max sets', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:50, reps:1 }] }).length === 0],
+      ['rejects too many reps', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1001 }] }).length > 0],
+      ['rejects insane weight', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, weight: 100000 }] }).length > 0],
+      ['rejects rest > 1 hour', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, rest: 3601 }] }).length > 0],
+      ['rejects NaN weight', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, weight: NaN }] }).length > 0],
+      ['rejects Infinity weight', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, weight: Infinity }] }).length > 0],
 
       // ───── export blob ─────
       ['valid empty export blob', () => e({ schema: 1, exportedAt: 0, library: {}, history: [] }).length === 0],

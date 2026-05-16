@@ -53,6 +53,13 @@
   function setHistory(v) { return store.set(K.history, v); }
 
   /* ─────────── VALIDATE ─────────── */
+  // Sanity caps so a bad paste can't produce a screen with 10,000 sets.
+  const MAX_SETS = 50;
+  const MAX_REPS = 1000;
+  const MAX_WEIGHT = 10000;
+  const MAX_REST = 3600;
+  const MAX_EXERCISES = 50;
+
   function validateWorkout(obj) {
     const errs = [];
     const isStr = (x) => typeof x === 'string' && x.length > 0;
@@ -72,6 +79,9 @@
       errs.push('Field "exercises" must be a non-empty array.');
       return errs;
     }
+    if (obj.exercises.length > MAX_EXERCISES) {
+      errs.push(`Field "exercises" has ${obj.exercises.length} entries; max is ${MAX_EXERCISES}.`);
+    }
     const ids = new Set();
     obj.exercises.forEach((ex, i) => {
       const at = `exercises[${i}]`;
@@ -84,9 +94,15 @@
       else ids.add(ex.id);
       if (!isStr(ex.name)) errs.push(`${at}.name must be a non-empty string.`);
       if (!isPosInt(ex.sets)) errs.push(`${at}.sets must be a positive integer.`);
+      else if (ex.sets > MAX_SETS) errs.push(`${at}.sets must be ≤ ${MAX_SETS}.`);
       if (!isPosInt(ex.reps)) errs.push(`${at}.reps must be a positive integer.`);
-      if (ex.weight != null && !(isNum(ex.weight) && ex.weight >= 0)) errs.push(`${at}.weight must be a non-negative number (or omitted).`);
-      if (ex.rest != null && !(isNum(ex.rest) && ex.rest >= 0)) errs.push(`${at}.rest must be a non-negative number of seconds (or omitted).`);
+      else if (ex.reps > MAX_REPS) errs.push(`${at}.reps must be ≤ ${MAX_REPS}.`);
+      if (ex.weight != null && !(isNum(ex.weight) && ex.weight >= 0 && ex.weight <= MAX_WEIGHT)) {
+        errs.push(`${at}.weight must be a non-negative number ≤ ${MAX_WEIGHT} (or omitted).`);
+      }
+      if (ex.rest != null && !(isNum(ex.rest) && ex.rest >= 0 && ex.rest <= MAX_REST)) {
+        errs.push(`${at}.rest must be a non-negative number of seconds ≤ ${MAX_REST} (or omitted).`);
+      }
       if (ex.notes != null && typeof ex.notes !== 'string') errs.push(`${at}.notes must be a string (or omitted).`);
     });
     return errs;
@@ -114,6 +130,12 @@
   const detailState = { workoutId: null };
 
   function show(name, opts = {}) {
+    // Leaving the Done screen for Home is the cue that the just-finished
+    // session is no longer needed in localStorage. History has the durable copy.
+    if (name === 'home') {
+      const active = getActive();
+      if (active && active.finishedAt) setActive(null);
+    }
     screens.forEach((s) => {
       s.hidden = s.dataset.screen !== name;
     });
@@ -280,6 +302,9 @@
   }
 
   /* ─────────── RENDER · Rest ─────────── */
+  let restTickToken = 0;  // bump to invalidate any in-flight ticker
+  let restFiring = false; // re-entrancy guard for finishRest
+
   function renderRest() {
     const active = getActive();
     if (!active || active.restEndsAt == null) { show('active'); return; }
@@ -289,23 +314,35 @@
 
     document.querySelector('[data-field="rest-chip"]').textContent =
       `${active.exerciseIndex + 1} / ${w.exercises.length} · NEXT SET ${active.setIndex + 1} / ${ex.sets}`;
-    document.querySelector('[data-field="rest-next"]').textContent =
-      `Set ${active.setIndex} done · Set ${active.setIndex + 1} of ${ex.sets} next`;
 
-    tickRest();
+    // "Set N done" should reflect the most recently logged set's setNumber,
+    // not the (already-advanced) active.setIndex which can be 0 across exercise
+    // boundaries.
+    const lastLogged = active.setsLog[active.setsLog.length - 1];
+    const justDone = lastLogged ? lastLogged.setNumber : 0;
+    document.querySelector('[data-field="rest-next"]').textContent =
+      `Set ${justDone} done · Set ${active.setIndex + 1} of ${ex.sets} next`;
+
+    startRestTicker();
   }
 
-  function tickRest() {
-    if (currentScreen !== 'rest') return;
-    const active = getActive();
-    if (!active || active.restEndsAt == null) return;
-    const remaining = Math.max(0, active.restEndsAt - Date.now());
-    document.querySelector('[data-field="rest-countdown"]').textContent = formatMS(remaining);
-    if (remaining <= 0) {
-      finishRest();
-    } else {
-      setTimeout(tickRest, 200);
-    }
+  function startRestTicker() {
+    const my = ++restTickToken;
+    const loop = () => {
+      if (my !== restTickToken) return;            // newer ticker exists
+      if (currentScreen !== 'rest') return;        // navigated away
+      const active = getActive();
+      if (!active || active.restEndsAt == null) return;
+      const remaining = Math.max(0, active.restEndsAt - Date.now());
+      const el = document.querySelector('[data-field="rest-countdown"]');
+      if (el) el.textContent = formatMS(remaining);
+      if (remaining <= 0) {
+        finishRest();
+      } else {
+        setTimeout(loop, 200);
+      }
+    };
+    loop();
   }
 
   function formatMS(ms) {
@@ -316,13 +353,19 @@
   }
 
   function finishRest() {
+    if (restFiring) return;
     const active = getActive();
     if (!active || active.restEndsAt == null) return;
+    restFiring = true;
+    restTickToken++;  // invalidate any other in-flight ticker
     active.restEndsAt = null;
     setActive(active);
     beep();
-    if (navigator.vibrate) navigator.vibrate(150);
+    // Double-buzz so a backgrounded app / disconnected AirPods still draw
+    // attention. iOS Safari ignores vibrate; harmless there.
+    if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
     show('active');
+    restFiring = false;
   }
 
   /* ─────────── RENDER · Done ─────────── */
@@ -552,8 +595,13 @@
     show('done');
   }
 
-  /* ─────────── KEYPAD modal ─────────── */
-  const keypadState = { target: null, buffer: '', maxDecimals: 0, label: '' };
+  /* ─────────── KEYPAD modal ───────────
+   * Opens showing the current value so the user knows the starting state, but
+   * the first digit press replaces the buffer. Backspace and decimal commit
+   * the buffer as an "in progress" edit (the user took explicit action), so
+   * subsequent keys append instead of replace.
+   */
+  const keypadState = { target: null, buffer: '', maxDecimals: 0, label: '', fresh: true };
 
   function openKeypad(target) {
     const ex = currentExercise();
@@ -563,14 +611,15 @@
       keypadState.target = 'reps';
       keypadState.buffer = String(activeUi.pendingReps != null ? activeUi.pendingReps : ex.reps);
       keypadState.maxDecimals = 0;
-      keypadState.label = 'REPS';
+      keypadState.label = 'REPS · type to replace';
     } else {
       const current = activeUi.pendingWeight != null ? activeUi.pendingWeight : (ex.weight != null ? ex.weight : 0);
       keypadState.target = 'weight';
       keypadState.buffer = String(current);
       keypadState.maxDecimals = 2;
-      keypadState.label = (w.unit || 'lb').toUpperCase();
+      keypadState.label = (w.unit || 'lb').toUpperCase() + ' · type to replace';
     }
+    keypadState.fresh = true;
     document.querySelector('[data-field="keypad-label"]').textContent = keypadState.label;
     document.querySelector('[data-field="keypad-display"]').textContent = keypadState.buffer;
     document.querySelector('[data-modal="keypad"]').hidden = false;
@@ -580,17 +629,27 @@
 
   function keypadKey(k) {
     if (k === 'back') {
+      // Backspace commits to "editing" mode and removes one digit.
+      keypadState.fresh = false;
       keypadState.buffer = keypadState.buffer.slice(0, -1);
     } else if (k === '.') {
       if (keypadState.maxDecimals === 0) return;
+      if (keypadState.fresh) { keypadState.buffer = '0'; keypadState.fresh = false; }
       if (keypadState.buffer.includes('.')) return;
       if (keypadState.buffer === '') keypadState.buffer = '0';
       keypadState.buffer += '.';
     } else {
-      // Replace a lone "0" with the first digit; otherwise append
-      if (keypadState.buffer === '0' && k !== '0') keypadState.buffer = k;
-      else if (keypadState.buffer === '0' && k === '0') return;
-      else keypadState.buffer += k;
+      // Digit: if the buffer is "fresh" (just opened), replace it. Otherwise append.
+      if (keypadState.fresh) {
+        keypadState.buffer = (k === '0') ? '0' : k;
+        keypadState.fresh = false;
+      } else if (keypadState.buffer === '0' && k !== '0') {
+        keypadState.buffer = k;
+      } else if (keypadState.buffer === '0' && k === '0') {
+        return;
+      } else {
+        keypadState.buffer += k;
+      }
     }
     // Enforce decimal cap
     if (keypadState.maxDecimals > 0 && keypadState.buffer.includes('.')) {
@@ -637,28 +696,36 @@
     confirmState.onOk = null;
   }
 
-  /* ─────────── HOLD button helper ─────────── */
+  /* ─────────── HOLD button helper ───────────
+   * 250ms hold-to-confirm. Guards against double-fire (a slow second
+   * pointerdown while a fire is pending) and against the iOS scroll/cancel
+   * race by marking the button touch-action: manipulation in CSS and using
+   * non-passive listeners. Gives a single haptic tick on press for feedback.
+   */
   function attachHold(btn, onConfirm) {
     let timer = null;
-    let confirmed = false;
+    let firing = false;  // true from fire start until next pointerdown
 
     const start = (e) => {
       if (e.cancelable) e.preventDefault();
-      confirmed = false;
+      if (firing) return;            // ignore re-press during in-flight fire
+      if (timer) clearTimeout(timer); // belt-and-suspenders
       btn.classList.add('holding');
+      if (navigator.vibrate) navigator.vibrate(8);
       timer = setTimeout(() => {
-        confirmed = true;
-        cleanup();
-        onConfirm();
+        timer = null;
+        firing = true;
+        btn.classList.remove('holding');
+        try { onConfirm(); }
+        finally { firing = false; }
       }, HOLD_DURATION_MS);
     };
     const cancel = () => {
       if (timer) { clearTimeout(timer); timer = null; }
       btn.classList.remove('holding');
     };
-    const cleanup = () => cancel();
 
-    btn.addEventListener('pointerdown', start);
+    btn.addEventListener('pointerdown', start, { passive: false });
     btn.addEventListener('pointerup', cancel);
     btn.addEventListener('pointercancel', cancel);
     btn.addEventListener('pointerleave', cancel);
@@ -680,6 +747,10 @@
     const active = getActive();
     if (!active || active.finishedAt) return;
     if (document.visibilityState === 'visible' && !wakeLock) requestWakeLock();
+    // Re-kick the rest timer in case the previous setTimeout chain was paused.
+    if (document.visibilityState === 'visible' && currentScreen === 'rest') {
+      startRestTicker();
+    }
   }
 
   /* ─────────── STORAGE persist ─────────── */
@@ -747,6 +818,25 @@
 
     // Wake lock re-acquire on visibility
     document.addEventListener('visibilitychange', reacquireWakeLockIfNeeded);
+
+    // Editing either Import textarea after a successful Validate must
+    // re-disable the commit button so the user can't ship a stale parse.
+    const importWorkoutTa = document.querySelector('[data-field="import-workout-textarea"]');
+    if (importWorkoutTa) importWorkoutTa.addEventListener('input', () => {
+      importWorkoutState.parsed = null;
+      const btn = document.querySelector('[data-action="import-workout-commit"]');
+      if (btn) btn.disabled = true;
+      const out = document.querySelector('[data-field="import-workout-output"]');
+      if (out) { out.textContent = ''; out.className = 'validate-output'; }
+    });
+    const importAllTa = document.querySelector('[data-field="import-all-textarea"]');
+    if (importAllTa) importAllTa.addEventListener('input', () => {
+      importAllState.parsed = null;
+      const btn = document.querySelector('[data-action="import-all-commit"]');
+      if (btn) btn.disabled = true;
+      const out = document.querySelector('[data-field="import-all-output"]');
+      if (out) { out.textContent = ''; out.className = 'validate-output'; }
+    });
   }
 
   function handleAction(action, el) {

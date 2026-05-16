@@ -2,7 +2,7 @@
  * Cache-first for the app shell; network-first for the SW itself (handled by
  * Cache-Control headers on the host). Bump CACHE_VERSION to force a refresh.
  */
-const CACHE_VERSION = 'workout-v1';
+const CACHE_VERSION = 'workout-v2';
 const SHELL = [
   './',
   './index.html',
@@ -36,13 +36,20 @@ self.addEventListener('fetch', (event) => {
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
       return fetch(event.request).then((resp) => {
-        // Cache successful GET responses for the shell scope on the fly
         if (resp && resp.status === 200 && resp.type === 'basic') {
           const clone = resp.clone();
           caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, clone));
         }
         return resp;
-      }).catch(() => cached);
+      }).catch(() => {
+        // Offline and not in cache. Return a synthetic 503 so the page sees a
+        // real Response object instead of an unresolved promise.
+        return new Response('Offline and not cached.', {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: { 'Content-Type': 'text/plain' },
+        });
+      });
     })
   );
 });
