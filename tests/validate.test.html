@@ -67,6 +67,13 @@
       ['rejects NaN weight', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, weight: NaN }] }).length > 0],
       ['rejects Infinity weight', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, weight: Infinity }] }).length > 0],
 
+      // ───── repsMin (rep ranges) ─────
+      ['accepts repsMin within range', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:8, repsMin:6 }] }).length === 0],
+      ['rejects repsMin > reps', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:6, repsMin:8 }] }).length > 0],
+      ['rejects negative repsMin', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:8, repsMin:-1 }] }).length > 0],
+      ['rejects non-integer repsMin', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:8, repsMin:6.5 }] }).length > 0],
+      ['accepts repsMin === reps', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:8, repsMin:8 }] }).length === 0],
+
       // ───── export blob ─────
       ['valid empty export blob', () => e({ schema: 1, exportedAt: 0, library: {}, history: [] }).length === 0],
       ['valid populated export blob', () => e({

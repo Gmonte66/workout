@@ -58,6 +58,7 @@
       "name": "Romanian Deadlift",
       "sets": 3,
       "reps": 8,
+      "repsMin": 6,
       "weight": 145,
       "rest": 150,
       "notes": "RPE 7-8. Breaking 5-month plateau at 135. Progression: +5-10 lb when 3x8 clean."
@@ -67,6 +68,7 @@
       "name": "Leg Press",
       "sets": 3,
       "reps": 10,
+      "repsMin": 8,
       "weight": 225,
       "rest": 120,
       "notes": "RPE 8. Starting weight is a guess (probably 200-250 based on prior journal) — find RPE 8 on set 1 and adjust. Progression: +10-20 lb when 3x10 clean."
@@ -76,6 +78,7 @@
       "name": "Leg Curl",
       "sets": 3,
       "reps": 12,
+      "repsMin": 10,
       "weight": 95,
       "rest": 90,
       "notes": "RPE 8. Control the eccentric. Was at 135 before knee issues at Quin. Progression: +5-10 lb when 3x12 clean."
@@ -85,6 +88,7 @@
       "name": "Standing Calf Raise",
       "sets": 3,
       "reps": 12,
+      "repsMin": 10,
       "weight": 50,
       "rest": 60,
       "notes": "RPE 8. Pause top and bottom. Progression: +5 lb every 2 weeks."

@@ -8,7 +8,7 @@
   'use strict';
 
   /* ─────────── CONST ─────────── */
-  const APP_VERSION = '1.2.0';
+  const APP_VERSION = '1.3.0';
   const SCHEMA = 1;
   const ONE_DAY = 86_400_000;
   const BACKUP_NAG_AFTER_MS = 30 * ONE_DAY;
@@ -96,6 +96,13 @@
       else if (ex.sets > MAX_SETS) errs.push(`${at}.sets must be ≤ ${MAX_SETS}.`);
       if (!isPosInt(ex.reps)) errs.push(`${at}.reps must be a positive integer.`);
       else if (ex.reps > MAX_REPS) errs.push(`${at}.reps must be ≤ ${MAX_REPS}.`);
+      if (ex.repsMin != null) {
+        if (!(Number.isInteger(ex.repsMin) && ex.repsMin >= 0 && ex.repsMin <= MAX_REPS)) {
+          errs.push(`${at}.repsMin must be a non-negative integer ≤ ${MAX_REPS} (or omitted).`);
+        } else if (isPosInt(ex.reps) && ex.repsMin > ex.reps) {
+          errs.push(`${at}.repsMin (${ex.repsMin}) must be ≤ reps (${ex.reps}).`);
+        }
+      }
       if (ex.weight != null && !(isNum(ex.weight) && ex.weight >= 0 && ex.weight <= MAX_WEIGHT)) {
         errs.push(`${at}.weight must be a non-negative number ≤ ${MAX_WEIGHT} (or omitted).`);
       }
@@ -217,7 +224,7 @@
       const restStr = ex.rest ? ` · ${ex.rest}s rest` : '';
       li.innerHTML = `<div class="ex-name"></div><div class="ex-plan"></div>`;
       li.querySelector('.ex-name').textContent = ex.name;
-      li.querySelector('.ex-plan').textContent = `${ex.sets} × ${ex.reps}${weightStr}${restStr}`;
+      li.querySelector('.ex-plan').textContent = `${ex.sets} × ${formatRepsPlan(ex)}${weightStr}${restStr}`;
       if (ex.notes) {
         const n = document.createElement('div');
         n.className = 'ex-notes';
@@ -244,6 +251,8 @@
     const currentWeight = defaultWeightForCurrentSet(active, ex);
 
     document.querySelector('[data-field="active-reps"]').textContent = currentReps;
+    document.querySelector('[data-field="active-reps-label"]').textContent =
+      hasRepsRange(ex) ? `REPS · ${ex.repsMin}-${ex.reps}` : 'REPS';
     const wEl = document.querySelector('[data-field="active-weight"]');
     const wCell = document.querySelector('[data-cell="weight"]');
     const wLabel = document.querySelector('[data-field="active-weight-unit"]');
@@ -274,6 +283,15 @@
 
   // Per-render UI state (not persisted; just current-set pending edits)
   const activeUi = { pendingReps: null, pendingWeight: null };
+
+  // True only when the exercise declares a range with distinct ends.
+  // `repsMin === reps` collapses to the single-number display.
+  function hasRepsRange(ex) {
+    return Number.isInteger(ex.repsMin) && ex.repsMin < ex.reps;
+  }
+  function formatRepsPlan(ex) {
+    return hasRepsRange(ex) ? `${ex.repsMin}-${ex.reps}` : `${ex.reps}`;
+  }
 
   function defaultRepsForCurrentSet(active, ex) {
     // Always default to plan target reps for this set, regardless of what was logged on prior sets.
