@@ -89,29 +89,7 @@ section[data-screen][hidden] { display: none; }
 .btn-icon { padding: 8px 12px; font-size: 22px; min-height: auto; }
 .btn-large { width: 100%; padding: 20px; font-size: 18px; margin-top: 16px; letter-spacing: 0.5px; }
 
-/* Hold-to-confirm button */
-.btn-hold {
-  position: relative;
-  overflow: hidden;
-  background: #066b4d;
-  touch-action: manipulation;
-  -webkit-user-select: none;
-  user-select: none;
-}
-.btn-hold.holding {
-  box-shadow: 0 0 0 2px #34d399 inset;
-}
-.btn-hold.holding .btn-hold-fill {
-  width: 100%;
-  transition: width 250ms linear;
-}
-.btn-hold-fill {
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 0;
-  background: #34d399;
-}
-.btn-hold-label { position: relative; z-index: 1; }
+.btn-set-done { touch-action: manipulation; }
 
 /* ─────────── Banners ─────────── */
 .banner {
@@ -175,7 +153,7 @@ section[data-screen][hidden] { display: none; }
   font-weight: 500;
 }
 .active-main { padding: 24px 20px; display: flex; flex-direction: column; min-height: 0; }
-.active-main .btn-hold { margin-top: auto; }
+.active-main .btn-set-done { margin-top: auto; }
 .exercise-name { font-size: 26px; font-weight: 700; line-height: 1.15; margin-bottom: 20px; }
 .active-card {
   display: flex;

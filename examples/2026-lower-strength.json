@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "id": "2026-lower-strength",
+  "name": "2026 Lower Strength",
+  "unit": "lb",
+  "exercises": [
+    {
+      "id": "warmup-bike",
+      "name": "Warmup — Bike",
+      "sets": 1,
+      "reps": 1,
+      "rest": 0,
+      "notes": "3 minutes easy spin."
+    },
+    {
+      "id": "warmup-glute-bridges",
+      "name": "Warmup — Glute Bridges",
+      "sets": 1,
+      "reps": 12,
+      "rest": 0,
+      "notes": "Slow. Bodyweight."
+    },
+    {
+      "id": "warmup-banded-lateral-walks",
+      "name": "Warmup — Banded Lateral Walks",
+      "sets": 1,
+      "reps": 10,
+      "rest": 0,
+      "notes": "10 each direction. Band above knees."
+    },
+    {
+      "id": "warmup-leg-swings",
+      "name": "Warmup — Leg Swings",
+      "sets": 1,
+      "reps": 10,
+      "rest": 0,
+      "notes": "10 front-to-back and 10 side-to-side, each leg."
+    },
+    {
+      "id": "warmup-bw-squats",
+      "name": "Warmup — Bodyweight Squats",
+      "sets": 1,
+      "reps": 8,
+      "rest": 0,
+      "notes": "Full depth."
+    },
+    {
+      "id": "back-squat",
+      "name": "Back Squat",
+      "sets": 4,
+      "reps": 5,
+      "weight": 135,
+      "rest": 180,
+      "notes": "RPE 7-8. Progression: +10/week through week 4, then +5/week."
+    },
+    {
+      "id": "romanian-deadlift",
+      "name": "Romanian Deadlift",
+      "sets": 3,
+      "reps": 8,
+      "weight": 145,
+      "rest": 150,
+      "notes": "RPE 7-8. Breaking 5-month plateau at 135. Progression: +5-10 lb when 3x8 clean."
+    },
+    {
+      "id": "leg-press",
+      "name": "Leg Press",
+      "sets": 3,
+      "reps": 10,
+      "weight": 225,
+      "rest": 120,
+      "notes": "RPE 8. Starting weight is a guess (probably 200-250 based on prior journal) — find RPE 8 on set 1 and adjust. Progression: +10-20 lb when 3x10 clean."
+    },
+    {
+      "id": "leg-curl",
+      "name": "Leg Curl",
+      "sets": 3,
+      "reps": 12,
+      "weight": 95,
+      "rest": 90,
+      "notes": "RPE 8. Control the eccentric. Was at 135 before knee issues at Quin. Progression: +5-10 lb when 3x12 clean."
+    },
+    {
+      "id": "standing-calf-raise",
+      "name": "Standing Calf Raise",
+      "sets": 3,
+      "reps": 12,
+      "weight": 50,
+      "rest": 60,
+      "notes": "RPE 8. Pause top and bottom. Progression: +5 lb every 2 weeks."
+    }
+  ]
+}

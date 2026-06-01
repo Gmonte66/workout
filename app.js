@@ -8,11 +8,10 @@
   'use strict';
 
   /* ─────────── CONST ─────────── */
-  const APP_VERSION = '1.0.0';
+  const APP_VERSION = '1.2.0';
   const SCHEMA = 1;
   const ONE_DAY = 86_400_000;
   const BACKUP_NAG_AFTER_MS = 30 * ONE_DAY;
-  const HOLD_DURATION_MS = 250;
 
   const K = {
     library: 'workout.library',
@@ -352,7 +351,9 @@
     return `${m}:${String(s).padStart(2, '0')}`;
   }
 
-  function finishRest() {
+  // `silent` is true when the user taps "Skip rest" — no cue needed, they
+  // initiated it. The natural rest-timer expiry path still beeps + buzzes.
+  function finishRest(opts = {}) {
     if (restFiring) return;
     const active = getActive();
     if (!active || active.restEndsAt == null) return;
@@ -360,10 +361,12 @@
     restTickToken++;  // invalidate any other in-flight ticker
     active.restEndsAt = null;
     setActive(active);
-    beep();
-    // Double-buzz so a backgrounded app / disconnected AirPods still draw
-    // attention. iOS Safari ignores vibrate; harmless there.
-    if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+    if (!opts.silent) {
+      beep();
+      // Double-buzz so a backgrounded app / disconnected AirPods still draw
+      // attention. iOS Safari ignores vibrate; harmless there.
+      if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+    }
     show('active');
     restFiring = false;
   }
@@ -696,41 +699,6 @@
     confirmState.onOk = null;
   }
 
-  /* ─────────── HOLD button helper ───────────
-   * 250ms hold-to-confirm. Guards against double-fire (a slow second
-   * pointerdown while a fire is pending) and against the iOS scroll/cancel
-   * race by marking the button touch-action: manipulation in CSS and using
-   * non-passive listeners. Gives a single haptic tick on press for feedback.
-   */
-  function attachHold(btn, onConfirm) {
-    let timer = null;
-    let firing = false;  // true from fire start until next pointerdown
-
-    const start = (e) => {
-      if (e.cancelable) e.preventDefault();
-      if (firing) return;            // ignore re-press during in-flight fire
-      if (timer) clearTimeout(timer); // belt-and-suspenders
-      btn.classList.add('holding');
-      if (navigator.vibrate) navigator.vibrate(8);
-      timer = setTimeout(() => {
-        timer = null;
-        firing = true;
-        btn.classList.remove('holding');
-        try { onConfirm(); }
-        finally { firing = false; }
-      }, HOLD_DURATION_MS);
-    };
-    const cancel = () => {
-      if (timer) { clearTimeout(timer); timer = null; }
-      btn.classList.remove('holding');
-    };
-
-    btn.addEventListener('pointerdown', start, { passive: false });
-    btn.addEventListener('pointerup', cancel);
-    btn.addEventListener('pointercancel', cancel);
-    btn.addEventListener('pointerleave', cancel);
-  }
-
   /* ─────────── WAKE lock ─────────── */
   let wakeLock = null;
   async function requestWakeLock() {
@@ -790,16 +758,13 @@
       const goEl = e.target.closest('[data-go]');
       if (goEl) { show(goEl.dataset.go); return; }
       const backEl = e.target.closest('[data-back]');
-      if (backEl) { window.history.back(); return; }
+      if (backEl) { show('home'); return; }
       const actEl = e.target.closest('[data-action]');
       if (actEl) handleAction(actEl.dataset.action, actEl);
       const keyEl = e.target.closest('[data-key]');
       if (keyEl) keypadKey(keyEl.dataset.key);
     });
 
-    // Hold-to-confirm for SET DONE
-    const setDoneBtn = document.querySelector('[data-action="set-done"]');
-    if (setDoneBtn) attachHold(setDoneBtn, () => { unlockAudio(); logSet(); });
 
     // Active value taps also open the keypad (in addition to the pencil)
     const repsCell = document.querySelector('[data-cell="reps"]');
@@ -848,12 +813,13 @@
       }); break;
 
       // Active set
+      case 'set-done': unlockAudio(); logSet(); break;
       case 'edit-reps': openKeypad('reps'); break;
       case 'edit-weight': openKeypad('weight'); break;
       case 'end-workout': endWorkout(); break;
 
       // Rest
-      case 'skip-rest': finishRest(); break;
+      case 'skip-rest': finishRest({ silent: true }); break;
       case 'undo-set': undoLastSet(); break;
 
       // Keypad modal
