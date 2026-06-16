@@ -231,7 +231,28 @@ section[data-screen][hidden] { display: none; }
   margin: 24px 0 16px;
   font-variant-numeric: tabular-nums;
 }
-.rest-next { color: #888; font-size: 15px; margin-bottom: 32px; }
+.rest-next { color: #888; font-size: 15px; margin-bottom: 24px; }
+.rest-activity {
+  background: #1a1a1a;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 28px;
+  width: 100%;
+  max-width: 340px;
+  text-align: center;
+  line-height: 1.4;
+}
+.rest-activity[hidden] { display: none; }
+.rest-activity .ra-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+.rest-activity .ra-prescription {
+  font-size: 14px;
+  color: #999;
+  margin-top: 4px;
+}
 .rest-main .btn { width: 100%; }
 .rest-main .btn + .btn { margin-top: 8px; }
 

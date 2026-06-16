@@ -8,7 +8,7 @@
   'use strict';
 
   /* ─────────── CONST ─────────── */
-  const APP_VERSION = '1.3.0';
+  const APP_VERSION = '1.4.0';
   const SCHEMA = 1;
   const ONE_DAY = 86_400_000;
   const BACKUP_NAG_AFTER_MS = 30 * ONE_DAY;
@@ -58,6 +58,8 @@
   const MAX_WEIGHT = 10000;
   const MAX_REST = 3600;
   const MAX_EXERCISES = 50;
+  const MAX_RA_NAME = 40;
+  const MAX_RA_PRESCRIPTION = 200;
 
   function validateWorkout(obj) {
     const errs = [];
@@ -110,6 +112,19 @@
         errs.push(`${at}.rest must be a non-negative number of seconds ≤ ${MAX_REST} (or omitted).`);
       }
       if (ex.notes != null && typeof ex.notes !== 'string') errs.push(`${at}.notes must be a string (or omitted).`);
+      if (ex.restActivity != null) {
+        if (typeof ex.restActivity !== 'object' || Array.isArray(ex.restActivity)) {
+          errs.push(`${at}.restActivity must be an object (or omitted).`);
+        } else {
+          const ra = ex.restActivity;
+          if (typeof ra.name !== 'string' || ra.name.length < 1 || ra.name.length > MAX_RA_NAME) {
+            errs.push(`${at}.restActivity.name must be a 1-${MAX_RA_NAME} character string.`);
+          }
+          if (typeof ra.prescription !== 'string' || ra.prescription.length < 1 || ra.prescription.length > MAX_RA_PRESCRIPTION) {
+            errs.push(`${at}.restActivity.prescription must be a 1-${MAX_RA_PRESCRIPTION} character string.`);
+          }
+        }
+      }
     });
     return errs;
   }
@@ -339,6 +354,15 @@
     const justDone = lastLogged ? lastLogged.setNumber : 0;
     document.querySelector('[data-field="rest-next"]').textContent =
       `Set ${justDone} done · Set ${active.setIndex + 1} of ${ex.sets} next`;
+
+    const raEl = document.querySelector('[data-field="rest-activity"]');
+    if (ex.restActivity) {
+      document.querySelector('[data-field="ra-name"]').textContent = ex.restActivity.name;
+      document.querySelector('[data-field="ra-prescription"]').textContent = ex.restActivity.prescription;
+      raEl.hidden = false;
+    } else {
+      raEl.hidden = true;
+    }
 
     startRestTicker();
   }

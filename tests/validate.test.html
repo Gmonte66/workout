@@ -74,6 +74,20 @@
       ['rejects non-integer repsMin', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:8, repsMin:6.5 }] }).length > 0],
       ['accepts repsMin === reps', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:8, repsMin:8 }] }).length === 0],
 
+      // ───── restActivity (prehab during rest) ─────
+      ['accepts valid restActivity', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, restActivity: { name: 'Toe yoga', prescription: '30s each foot' } }] }).length === 0],
+      ['accepts omitted restActivity', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1 }] }).length === 0],
+      ['accepts null restActivity (treated as omitted)', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, restActivity: null }] }).length === 0],
+      ['rejects restActivity missing name', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, restActivity: { prescription: 'x' } }] }).length > 0],
+      ['rejects restActivity missing prescription', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, restActivity: { name: 'x' } }] }).length > 0],
+      ['rejects restActivity name empty string', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, restActivity: { name: '', prescription: 'x' } }] }).length > 0],
+      ['rejects restActivity name too long (>40)', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, restActivity: { name: 'a'.repeat(41), prescription: 'x' } }] }).length > 0],
+      ['accepts restActivity name exactly 40', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, restActivity: { name: 'a'.repeat(40), prescription: 'x' } }] }).length === 0],
+      ['rejects restActivity prescription too long (>200)', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, restActivity: { name: 'x', prescription: 'a'.repeat(201) } }] }).length > 0],
+      ['accepts restActivity prescription exactly 200', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, restActivity: { name: 'x', prescription: 'a'.repeat(200) } }] }).length === 0],
+      ['rejects restActivity as array', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, restActivity: [] }] }).length > 0],
+      ['rejects restActivity name as non-string', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, restActivity: { name: 123, prescription: 'x' } }] }).length > 0],
+
       // ───── export blob ─────
       ['valid empty export blob', () => e({ schema: 1, exportedAt: 0, library: {}, history: [] }).length === 0],
       ['valid populated export blob', () => e({

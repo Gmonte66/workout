@@ -12,7 +12,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="icon" href="icons/icon-192.png" type="image/png">
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 
@@ -95,6 +95,11 @@
     <div class="rest-label">REST</div>
     <div class="rest-countdown" data-field="rest-countdown">0:00</div>
     <div class="rest-next" data-field="rest-next"></div>
+
+    <div class="rest-activity" data-field="rest-activity" hidden>
+      <div class="ra-name" data-field="ra-name"></div>
+      <div class="ra-prescription" data-field="ra-prescription"></div>
+    </div>
 
     <button class="btn btn-primary btn-large" data-action="skip-rest">Skip rest</button>
     <button class="btn btn-secondary" data-action="undo-set">Undo last set</button>
@@ -204,6 +209,6 @@
   </div>
 </div>
 
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
