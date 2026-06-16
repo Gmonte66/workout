@@ -12,7 +12,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="icon" href="icons/icon-192.png" type="image/png">
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 
@@ -136,6 +136,13 @@
   </header>
   <main>
     <section class="settings-block">
+      <h3>Default workouts</h3>
+      <p class="subtitle" data-field="defaults-status"></p>
+      <button class="btn btn-secondary" data-action="restore-defaults">Restore missing defaults</button>
+      <div class="status-line" data-field="defaults-output"></div>
+    </section>
+
+    <section class="settings-block">
       <h3>Import workout</h3>
       <p class="subtitle">Paste a workout JSON below.</p>
       <textarea data-field="import-workout-textarea" rows="10" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off"></textarea>
@@ -209,6 +216,6 @@
   </div>
 </div>
 
-<script src="app.js?v=5"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>

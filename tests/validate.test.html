@@ -88,6 +88,77 @@
       ['rejects restActivity as array', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, restActivity: [] }] }).length > 0],
       ['rejects restActivity name as non-string', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1, restActivity: { name: 123, prescription: 'x' } }] }).length > 0],
 
+      // ───── supersetId (group two or more exercises) ─────
+      ['accepts valid superset pair', () => v({ version: 1, id: 'a', name: 'A', exercises: [
+        { id:'x', name:'X', sets:4, reps:10, supersetId:'ss1' },
+        { id:'y', name:'Y', sets:4, reps:15, supersetId:'ss1' },
+      ] }).length === 0],
+      ['accepts valid superset triset', () => v({ version: 1, id: 'a', name: 'A', exercises: [
+        { id:'x', name:'X', sets:3, reps:10, supersetId:'tri' },
+        { id:'y', name:'Y', sets:3, reps:10, supersetId:'tri' },
+        { id:'z', name:'Z', sets:3, reps:10, supersetId:'tri' },
+      ] }).length === 0],
+      ['accepts two distinct supersets in one workout', () => v({ version: 1, id: 'a', name: 'A', exercises: [
+        { id:'x', name:'X', sets:3, reps:5, supersetId:'ss1' },
+        { id:'y', name:'Y', sets:3, reps:5, supersetId:'ss1' },
+        { id:'z', name:'Z', sets:3, reps:8 },
+        { id:'p', name:'P', sets:2, reps:12, supersetId:'ss2' },
+        { id:'q', name:'Q', sets:2, reps:12, supersetId:'ss2' },
+      ] }).length === 0],
+      ['rejects superset group of 1', () => v({ version: 1, id: 'a', name: 'A', exercises: [
+        { id:'x', name:'X', sets:1, reps:1, supersetId:'ss1' },
+        { id:'y', name:'Y', sets:1, reps:1 },
+      ] }).length > 0],
+      ['rejects superset members with different set counts', () => v({ version: 1, id: 'a', name: 'A', exercises: [
+        { id:'x', name:'X', sets:4, reps:10, supersetId:'ss1' },
+        { id:'y', name:'Y', sets:3, reps:15, supersetId:'ss1' },
+      ] }).length > 0],
+      ['rejects non-contiguous superset members', () => v({ version: 1, id: 'a', name: 'A', exercises: [
+        { id:'x', name:'X', sets:3, reps:10, supersetId:'ss1' },
+        { id:'z', name:'Z', sets:3, reps:5 },
+        { id:'y', name:'Y', sets:3, reps:10, supersetId:'ss1' },
+      ] }).length > 0],
+      ['rejects empty supersetId string', () => v({ version: 1, id: 'a', name: 'A', exercises: [
+        { id:'x', name:'X', sets:1, reps:1, supersetId:'' },
+        { id:'y', name:'Y', sets:1, reps:1, supersetId:'' },
+      ] }).length > 0],
+      ['rejects non-string supersetId', () => v({ version: 1, id: 'a', name: 'A', exercises: [
+        { id:'x', name:'X', sets:1, reps:1, supersetId:1 },
+        { id:'y', name:'Y', sets:1, reps:1, supersetId:1 },
+      ] }).length > 0],
+      ['accepts omitted supersetId', () => v({ version: 1, id: 'a', name: 'A', exercises: [{ id:'x', name:'X', sets:1, reps:1 }] }).length === 0],
+      ['rejects supersetId longer than 40 chars', () => v({ version: 1, id: 'a', name: 'A', exercises: [
+        { id:'x', name:'X', sets:1, reps:1, supersetId:'g'.repeat(41) },
+        { id:'y', name:'Y', sets:1, reps:1, supersetId:'g'.repeat(41) },
+      ] }).length > 0],
+      ['accepts supersetId exactly 40 chars', () => v({ version: 1, id: 'a', name: 'A', exercises: [
+        { id:'x', name:'X', sets:1, reps:1, supersetId:'g'.repeat(40) },
+        { id:'y', name:'Y', sets:1, reps:1, supersetId:'g'.repeat(40) },
+      ] }).length === 0],
+      ['rejects supersetId as boolean', () => v({ version: 1, id: 'a', name: 'A', exercises: [
+        { id:'x', name:'X', sets:1, reps:1, supersetId:true },
+        { id:'y', name:'Y', sets:1, reps:1, supersetId:true },
+      ] }).length > 0],
+      ['accepts large superset (quad-set)', () => v({ version: 1, id: 'a', name: 'A', exercises: [
+        { id:'a1', name:'A1', sets:3, reps:10, supersetId:'quad' },
+        { id:'a2', name:'A2', sets:3, reps:10, supersetId:'quad' },
+        { id:'a3', name:'A3', sets:3, reps:10, supersetId:'quad' },
+        { id:'a4', name:'A4', sets:3, reps:10, supersetId:'quad' },
+      ] }).length === 0],
+      ['rejects same supersetId separated by a non-superset exercise', () => v({ version: 1, id: 'a', name: 'A', exercises: [
+        { id:'x', name:'X', sets:2, reps:10, supersetId:'ss1' },
+        { id:'y', name:'Y', sets:2, reps:10, supersetId:'ss1' },
+        { id:'gap', name:'GAP', sets:2, reps:10 },
+        { id:'z', name:'Z', sets:2, reps:10, supersetId:'ss1' },
+        { id:'w', name:'W', sets:2, reps:10, supersetId:'ss1' },
+      ] }).length > 0],
+      ['accepts two distinct supersets back-to-back with no gap', () => v({ version: 1, id: 'a', name: 'A', exercises: [
+        { id:'x', name:'X', sets:3, reps:10, supersetId:'ssA' },
+        { id:'y', name:'Y', sets:3, reps:10, supersetId:'ssA' },
+        { id:'p', name:'P', sets:2, reps:12, supersetId:'ssB' },
+        { id:'q', name:'Q', sets:2, reps:12, supersetId:'ssB' },
+      ] }).length === 0],
+
       // ───── export blob ─────
       ['valid empty export blob', () => e({ schema: 1, exportedAt: 0, library: {}, history: [] }).length === 0],
       ['valid populated export blob', () => e({

@@ -131,6 +131,17 @@ section[data-screen][hidden] { display: none; }
 .exercise-list .ex-name { font-size: 16px; font-weight: 600; }
 .exercise-list .ex-plan { font-size: 13px; color: #888; margin-top: 4px; }
 .exercise-list .ex-notes { font-size: 13px; color: #999; margin-top: 6px; font-style: italic; }
+.exercise-list .ex-superset {
+  border-left: 3px solid #10b981;
+  padding-left: 12px;
+}
+.exercise-list .ex-superset-badge {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: #10b981;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
 .subtitle { color: #888; font-size: 14px; }
 
 .lockdown-reminder {

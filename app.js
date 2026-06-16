@@ -8,7 +8,7 @@
   'use strict';
 
   /* ─────────── CONST ─────────── */
-  const APP_VERSION = '1.4.0';
+  const APP_VERSION = '1.6.0';
   const SCHEMA = 1;
   const ONE_DAY = 86_400_000;
   const BACKUP_NAG_AFTER_MS = 30 * ONE_DAY;
@@ -20,6 +20,7 @@
     lastExport: 'workout.lastExport',
     previous: 'workout.previous',
     schema: 'workout.schema',
+    defaultsSeeded: 'workout.defaultsSeeded',
   };
 
   /* ─────────── STORAGE ─────────── */
@@ -60,6 +61,7 @@
   const MAX_EXERCISES = 50;
   const MAX_RA_NAME = 40;
   const MAX_RA_PRESCRIPTION = 200;
+  const MAX_SUPERSET_ID = 40;
 
   function validateWorkout(obj) {
     const errs = [];
@@ -125,7 +127,44 @@
           }
         }
       }
+      if (ex.supersetId != null && (typeof ex.supersetId !== 'string' || ex.supersetId.length < 1 || ex.supersetId.length > MAX_SUPERSET_ID)) {
+        errs.push(`${at}.supersetId must be a 1-${MAX_SUPERSET_ID} character string (or omitted).`);
+      }
     });
+
+    // Cross-exercise superset rules: each group must have ≥2 contiguous members
+    // with identical set counts. Non-contiguous IDs are invalid (alternation
+    // semantics break if a non-member sits between members).
+    const groupRuns = [];
+    let run = null;
+    obj.exercises.forEach((ex, i) => {
+      const id = typeof ex === 'object' && ex && typeof ex.supersetId === 'string' ? ex.supersetId : null;
+      if (id && id.length > 0) {
+        if (run && run.id === id) run.members.push({ ex, i });
+        else { if (run) groupRuns.push(run); run = { id, members: [{ ex, i }] }; }
+      } else {
+        if (run) groupRuns.push(run);
+        run = null;
+      }
+    });
+    if (run) groupRuns.push(run);
+
+    const seenGroupIds = new Set();
+    groupRuns.forEach((g) => {
+      if (g.members.length < 2) {
+        errs.push(`supersetId "${g.id}" has only ${g.members.length} contiguous member(s); groups need ≥2 adjacent exercises sharing the id.`);
+      }
+      const firstSets = g.members[0].ex.sets;
+      const mismatched = g.members.find((m) => m.ex.sets !== firstSets);
+      if (mismatched) {
+        errs.push(`supersetId "${g.id}" members must all have the same sets count; got ${g.members.map((m) => m.ex.sets).join(', ')}.`);
+      }
+      if (seenGroupIds.has(g.id)) {
+        errs.push(`supersetId "${g.id}" appears in non-contiguous positions; group members must be adjacent in the exercises array.`);
+      }
+      seenGroupIds.add(g.id);
+    });
+
     return errs;
   }
 
@@ -233,13 +272,43 @@
 
     const list = document.querySelector('[data-list="detail-exercises"]');
     list.innerHTML = '';
-    w.exercises.forEach((ex) => {
+    w.exercises.forEach((ex, i) => {
+      const inSS = ex.supersetId != null;
+      const prevSameSS = inSS && i > 0 && w.exercises[i - 1].supersetId === ex.supersetId;
+      const nextSameSS = inSS && i < w.exercises.length - 1 && w.exercises[i + 1].supersetId === ex.supersetId;
+      const isFirstInSS = inSS && !prevSameSS;
+      const isLastInSS = inSS && !nextSameSS;
+
       const li = document.createElement('li');
+      if (inSS) {
+        li.classList.add('ex-superset');
+        if (isFirstInSS) li.classList.add('ex-superset-first');
+        if (isLastInSS) li.classList.add('ex-superset-last');
+        if (!isFirstInSS && !isLastInSS) li.classList.add('ex-superset-mid');
+      }
+
+      if (isFirstInSS) {
+        let groupSize = 1;
+        for (let j = i + 1; j < w.exercises.length && w.exercises[j].supersetId === ex.supersetId; j++) groupSize++;
+        const badge = document.createElement('div');
+        badge.className = 'ex-superset-badge';
+        badge.textContent = `SUPERSET · ${groupSize} EXERCISES`;
+        li.appendChild(badge);
+      }
+
       const weightStr = ex.weight != null ? ` @ ${ex.weight} ${w.unit || 'lb'}` : '';
-      const restStr = ex.rest ? ` · ${ex.rest}s rest` : '';
-      li.innerHTML = `<div class="ex-name"></div><div class="ex-plan"></div>`;
-      li.querySelector('.ex-name').textContent = ex.name;
-      li.querySelector('.ex-plan').textContent = `${ex.sets} × ${formatRepsPlan(ex)}${weightStr}${restStr}`;
+      const restStr = inSS && !isLastInSS
+        ? ' · → next'
+        : (ex.rest ? ` · ${ex.rest}s rest` : '');
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'ex-name';
+      nameDiv.textContent = ex.name;
+      const planDiv = document.createElement('div');
+      planDiv.className = 'ex-plan';
+      planDiv.textContent = `${ex.sets} × ${formatRepsPlan(ex)}${weightStr}${restStr}`;
+      li.appendChild(nameDiv);
+      li.appendChild(planDiv);
+
       if (ex.notes) {
         const n = document.createElement('div');
         n.className = 'ex-notes';
@@ -258,8 +327,10 @@
     if (!w) { show('home'); return; }
     const ex = w.exercises[active.exerciseIndex];
 
-    document.querySelector('[data-field="active-chip"]').textContent =
-      `${active.exerciseIndex + 1} / ${w.exercises.length} · SET ${active.setIndex + 1} / ${ex.sets}`;
+    const groupA = getSupersetGroup(w, active.exerciseIndex);
+    document.querySelector('[data-field="active-chip"]').textContent = groupA
+      ? `${active.exerciseIndex + 1} / ${w.exercises.length} · SS ${groupA.myPos + 1}/${groupA.members.length} · ROUND ${active.setIndex + 1} / ${ex.sets}`
+      : `${active.exerciseIndex + 1} / ${w.exercises.length} · SET ${active.setIndex + 1} / ${ex.sets}`;
     document.querySelector('[data-field="active-name"]').textContent = ex.name;
 
     const currentReps = defaultRepsForCurrentSet(active, ex);
@@ -304,6 +375,26 @@
   function hasRepsRange(ex) {
     return Number.isInteger(ex.repsMin) && ex.repsMin < ex.reps;
   }
+
+  // Returns { startIdx, endIdx, members, myPos } when exerciseIndex falls
+  // inside a superset group (contiguous run of exercises sharing supersetId).
+  // Returns null for sequential exercises. Relies on the validator enforcing
+  // contiguity, so we only walk neighbors.
+  function getSupersetGroup(workout, exerciseIndex) {
+    const ex = workout.exercises[exerciseIndex];
+    if (!ex || !ex.supersetId) return null;
+    const id = ex.supersetId;
+    let startIdx = exerciseIndex;
+    while (startIdx > 0 && workout.exercises[startIdx - 1].supersetId === id) startIdx--;
+    let endIdx = exerciseIndex;
+    while (endIdx < workout.exercises.length - 1 && workout.exercises[endIdx + 1].supersetId === id) endIdx++;
+    return {
+      startIdx,
+      endIdx,
+      members: workout.exercises.slice(startIdx, endIdx + 1),
+      myPos: exerciseIndex - startIdx,
+    };
+  }
   function formatRepsPlan(ex) {
     return hasRepsRange(ex) ? `${ex.repsMin}-${ex.reps}` : `${ex.reps}`;
   }
@@ -344,21 +435,41 @@
     if (!w) { show('home'); return; }
     const ex = w.exercises[active.exerciseIndex];
 
-    document.querySelector('[data-field="rest-chip"]').textContent =
-      `${active.exerciseIndex + 1} / ${w.exercises.length} · NEXT SET ${active.setIndex + 1} / ${ex.sets}`;
+    const groupR = getSupersetGroup(w, active.exerciseIndex);
+    document.querySelector('[data-field="rest-chip"]').textContent = groupR
+      ? `${active.exerciseIndex + 1} / ${w.exercises.length} · SS ${groupR.myPos + 1}/${groupR.members.length} · NEXT ROUND ${active.setIndex + 1} / ${ex.sets}`
+      : `${active.exerciseIndex + 1} / ${w.exercises.length} · NEXT SET ${active.setIndex + 1} / ${ex.sets}`;
 
     // "Set N done" should reflect the most recently logged set's setNumber,
     // not the (already-advanced) active.setIndex which can be 0 across exercise
-    // boundaries.
+    // boundaries. Three cases:
+    //   - Inside a superset cycle: name + round on both sides.
+    //   - Cross-exercise transition (e.g. superset → next, or sequential A→B):
+    //     name the previous and upcoming exercises so the user isn't guessing
+    //     which "Set 3" refers to what.
+    //   - Same-exercise between-sets rest: the plain "Set N of K" form.
     const lastLogged = active.setsLog[active.setsLog.length - 1];
     const justDone = lastLogged ? lastLogged.setNumber : 0;
-    document.querySelector('[data-field="rest-next"]').textContent =
-      `Set ${justDone} done · Set ${active.setIndex + 1} of ${ex.sets} next`;
+    const justEx = lastLogged ? w.exercises.find((e) => e.id === lastLogged.exerciseId) : null;
+    const justName = justEx ? justEx.name : (lastLogged ? lastLogged.exerciseId : '');
+    let restNextText;
+    if (lastLogged && groupR) {
+      restNextText = `${justName} R${justDone} done · ${ex.name} R${active.setIndex + 1} next`;
+    } else if (lastLogged && justEx && justEx.id !== ex.id) {
+      restNextText = `${justName} done · ${ex.name} Set ${active.setIndex + 1} of ${ex.sets} next`;
+    } else {
+      restNextText = `Set ${justDone} done · Set ${active.setIndex + 1} of ${ex.sets} next`;
+    }
+    document.querySelector('[data-field="rest-next"]').textContent = restNextText;
 
+    // Activity panel — defaults to upcoming exercise's, but inter-round rest
+    // inside a superset uses the just-finished last-member's activity.
+    const sourceId = active.restActivitySourceId;
+    const activityEx = sourceId ? (w.exercises.find((e) => e.id === sourceId) || ex) : ex;
     const raEl = document.querySelector('[data-field="rest-activity"]');
-    if (ex.restActivity) {
-      document.querySelector('[data-field="ra-name"]').textContent = ex.restActivity.name;
-      document.querySelector('[data-field="ra-prescription"]').textContent = ex.restActivity.prescription;
+    if (activityEx.restActivity) {
+      document.querySelector('[data-field="ra-name"]').textContent = activityEx.restActivity.name;
+      document.querySelector('[data-field="ra-prescription"]').textContent = activityEx.restActivity.prescription;
       raEl.hidden = false;
     } else {
       raEl.hidden = true;
@@ -510,6 +621,14 @@
 
     document.querySelector('[data-field="about-info"]').textContent =
       `v${APP_VERSION} · schema ${SCHEMA} · ${Object.keys(getLibrary()).length} workouts · ${getHistory().length} sessions`;
+
+    const lib = getLibrary();
+    const missing = DEFAULT_WORKOUTS.filter((w) => !lib[w.id]);
+    const present = DEFAULT_WORKOUTS.length - missing.length;
+    document.querySelector('[data-field="defaults-status"]').textContent =
+      `${present} of ${DEFAULT_WORKOUTS.length} default workouts in your library` +
+      (missing.length > 0 ? `. Missing: ${missing.map((w) => w.name).join(', ')}.` : '.');
+    document.querySelector('[data-action="restore-defaults"]').disabled = missing.length === 0;
   }
 
   const importWorkoutState = { parsed: null };
@@ -565,27 +684,60 @@
     if (weight != null) {
       active.lastWeightByExercise[ex.id] = weight;
     }
-    active.setIndex += 1;
 
-    // advance to next exercise or finish
-    if (active.setIndex >= ex.sets) {
-      active.setIndex = 0;
-      active.exerciseIndex += 1;
-      if (active.exerciseIndex >= w.exercises.length) {
-        finishWorkout(active);
-        return;
+    // Advance — either superset cycling or plain sequential.
+    const group = getSupersetGroup(w, active.exerciseIndex);
+    if (group) {
+      if (group.myPos < group.members.length - 1) {
+        // Mid-round in a group: jump to next member, same round (setIndex unchanged).
+        active.exerciseIndex = group.startIdx + group.myPos + 1;
+      } else {
+        // Just finished the last member → completed a round.
+        active.setIndex += 1;
+        if (active.setIndex >= ex.sets) {
+          // Group complete — advance past the group.
+          active.exerciseIndex = group.endIdx + 1;
+          active.setIndex = 0;
+          if (active.exerciseIndex >= w.exercises.length) {
+            finishWorkout(active);
+            return;
+          }
+        } else {
+          // Next round — back to first member.
+          active.exerciseIndex = group.startIdx;
+        }
+      }
+    } else {
+      active.setIndex += 1;
+      if (active.setIndex >= ex.sets) {
+        active.setIndex = 0;
+        active.exerciseIndex += 1;
+        if (active.exerciseIndex >= w.exercises.length) {
+          finishWorkout(active);
+          return;
+        }
       }
     }
 
-    // schedule rest if next exercise (or current) has a rest value
+    // Rest: default is upcoming exercise's rest. Exception — inter-round
+    // transition inside a group: the rest belongs to the JUST-FINISHED last
+    // member, since that's where the user encodes the round's rest.
     const upcoming = w.exercises[active.exerciseIndex];
-    const restSec = upcoming.rest && upcoming.rest > 0 ? upcoming.rest : 0;
+    let restEx = upcoming;
+    let restSourceId = null;
+    if (ex.supersetId && upcoming && upcoming.supersetId === ex.supersetId) {
+      restEx = ex;
+      restSourceId = ex.id;
+    }
+    const restSec = restEx && restEx.rest && restEx.rest > 0 ? restEx.rest : 0;
     if (restSec > 0) {
       active.restEndsAt = Date.now() + restSec * 1000;
+      active.restActivitySourceId = restSourceId;
       setActive(active);
       show('rest');
     } else {
       active.restEndsAt = null;
+      active.restActivitySourceId = null;
       setActive(active);
       show('active');
     }
@@ -877,6 +1029,17 @@
         break;
       }
 
+      // Settings — defaults
+      case 'restore-defaults': {
+        const added = restoreDefaults();
+        const out = document.querySelector('[data-field="defaults-output"]');
+        out.textContent = added > 0
+          ? `Restored ${added} default workout${added === 1 ? '' : 's'}.`
+          : 'Nothing to restore — all defaults are already in your library.';
+        renderSettings();
+        break;
+      }
+
       // Settings — import workout
       case 'import-workout-validate': importWorkoutValidate(); break;
       case 'import-workout-commit': importWorkoutCommit(); break;
@@ -1019,6 +1182,522 @@
     out.textContent = 'Reverted to previous library and history.';
   }
 
+  /* ─────────── DEFAULTS ─────────── */
+  // Bundled workouts seeded into the library on first launch. The user can
+  // delete any of them without them returning; Settings → Restore defaults
+  // re-adds any that are missing without touching the rest of the library.
+  const DEFAULT_WORKOUTS = [
+      {
+          "version": 1,
+          "id": "monday_upper_a",
+          "name": "Upper A (Push)",
+          "unit": "lb",
+          "exercises": [
+              {
+                  "id": "warmup-bike-row",
+                  "name": "Warmup — Bike or Row",
+                  "sets": 1,
+                  "reps": 1,
+                  "rest": 0,
+                  "notes": "3 minutes easy."
+              },
+              {
+                  "id": "warmup-band-pull-aparts",
+                  "name": "Warmup — Band Pull-Aparts",
+                  "sets": 2,
+                  "reps": 15,
+                  "rest": 0,
+                  "notes": "Light band, squeeze at end range."
+              },
+              {
+                  "id": "warmup-band-external-rotations",
+                  "name": "Warmup — Band External Rotations",
+                  "sets": 2,
+                  "reps": 10,
+                  "rest": 0,
+                  "notes": "10 each side. Light band. Elbow glued to side."
+              },
+              {
+                  "id": "warmup-wall-slides",
+                  "name": "Warmup — Wall Slides",
+                  "sets": 1,
+                  "reps": 10,
+                  "rest": 0,
+                  "notes": "Back flat against wall, arms in goalpost position."
+              },
+              {
+                  "id": "warmup-tib-raises",
+                  "name": "Warmup — Tib Raises",
+                  "sets": 2,
+                  "reps": 15,
+                  "rest": 0,
+                  "notes": "Heels on floor, lift toes against wall or weight."
+              },
+              {
+                  "id": "warmup-cat-cow",
+                  "name": "Warmup — Cat-Cow",
+                  "sets": 1,
+                  "reps": 8,
+                  "rest": 0,
+                  "notes": "Slow, full range, breathe with it."
+              },
+              {
+                  "id": "warmup-scapular-pull-ups",
+                  "name": "Warmup — Scapular Pull-Ups",
+                  "sets": 1,
+                  "reps": 8,
+                  "rest": 0,
+                  "notes": "Hang, pull shoulder blades down and back without bending arms."
+              },
+              {
+                  "id": "incline-db-press",
+                  "name": "Incline DB Press",
+                  "sets": 4,
+                  "reps": 8,
+                  "repsMin": 6,
+                  "weight": 45,
+                  "rest": 180,
+                  "restActivity": {
+                      "name": "Neck CARs",
+                      "prescription": "1 slow circle each direction"
+                  },
+                  "notes": "RPE 7-8. 30-45 degree bench. 45s, or 40s if 45s feel like RPE 9."
+              },
+              {
+                  "id": "pull-up",
+                  "name": "Pull-up",
+                  "sets": 4,
+                  "reps": 8,
+                  "repsMin": 6,
+                  "weight": 0,
+                  "rest": 180,
+                  "restActivity": {
+                      "name": "Doorway pec stretch",
+                      "prescription": "30 sec each side"
+                  },
+                  "notes": "RPE 8. Weighted if possible, assisted if needed. Find weight or assist for 8 clean reps. Goal: 3-5 strict unassisted by week 8."
+              },
+              {
+                  "id": "standing-db-ohp",
+                  "name": "Standing DB Overhead Press",
+                  "sets": 3,
+                  "reps": 8,
+                  "repsMin": 6,
+                  "weight": 35,
+                  "rest": 150,
+                  "restActivity": {
+                      "name": "Open-book / T-spine extension",
+                      "prescription": "5 each side"
+                  },
+                  "notes": "RPE 7-8. 35 lb DBs to start, find RPE 7-8. Strict, no leg drive, ribs down. Lumbar arch = first sign too heavy → drop weight or move to seated DB."
+              },
+              {
+                  "id": "chest-supported-row",
+                  "name": "Chest-Supported Row",
+                  "sets": 3,
+                  "reps": 10,
+                  "repsMin": 8,
+                  "weight": 70,
+                  "rest": 120,
+                  "restActivity": {
+                      "name": "Thread the needle",
+                      "prescription": "5 each side"
+                  },
+                  "notes": "RPE 7-8. Squeeze 1 sec at contraction, control negative. Find RPE 7 weight in week 1."
+              },
+              {
+                  "id": "lateral-raise",
+                  "name": "Lateral Raise",
+                  "sets": 4,
+                  "reps": 15,
+                  "repsMin": 12,
+                  "weight": 10,
+                  "rest": 60,
+                  "restActivity": {
+                      "name": "Wall pec/shoulder stretch",
+                      "prescription": "30 sec each side"
+                  },
+                  "notes": "RPE 9. Scapular plane, slight pour, no upper-trap shrug. Top isolation priority."
+              },
+              {
+                  "id": "overhead-tricep-extension",
+                  "name": "Overhead Tricep Extension",
+                  "sets": 2,
+                  "reps": 12,
+                  "repsMin": 10,
+                  "weight": 40,
+                  "rest": 60,
+                  "notes": "RPE 8. Rope from low cable or single-arm DB. Arm overhead, stretch long head at bottom, control eccentric."
+              },
+              {
+                  "id": "supinating-curl",
+                  "name": "Supinating Curl",
+                  "sets": 3,
+                  "reps": 12,
+                  "repsMin": 10,
+                  "weight": 25,
+                  "rest": 60,
+                  "notes": "RPE 8. Incline DB or EZ-bar. Short-head / peak bias. Start 25 lb DBs or find RPE 8."
+              },
+              {
+                  "id": "tricep-pushdown",
+                  "name": "Tricep Pushdown",
+                  "sets": 2,
+                  "reps": 15,
+                  "repsMin": 12,
+                  "weight": 45,
+                  "rest": 60,
+                  "notes": "RPE 8-9. Start 45 lb (new gym pulley ratio — not 75). Hits lockout/contracted position; complements Mon overhead extension (stretched position)."
+              }
+          ]
+      },
+      {
+          "version": 1,
+          "id": "wednesday_lower_strength",
+          "name": "Lower Strength",
+          "unit": "lb",
+          "exercises": [
+              {
+                  "id": "warmup-bike",
+                  "name": "Warmup — Bike",
+                  "sets": 1,
+                  "reps": 1,
+                  "rest": 0,
+                  "notes": "3 minutes easy spin."
+              },
+              {
+                  "id": "warmup-calf-raise-toe-spread",
+                  "name": "Warmup — Calf Raise + Toe Spread",
+                  "sets": 2,
+                  "reps": 15,
+                  "rest": 0,
+                  "notes": "Barefoot. Slow calf raises with conscious toe spread at top and bottom. 2 x 15 each foot."
+              },
+              {
+                  "id": "warmup-tib-raises",
+                  "name": "Warmup — Tib Raises",
+                  "sets": 2,
+                  "reps": 15,
+                  "rest": 0,
+                  "notes": "Heels on floor, lift toes against wall or weight. Anterior tibialis."
+              },
+              {
+                  "id": "warmup-resisted-ankle-inversion",
+                  "name": "Warmup — Resisted Ankle Inversion",
+                  "sets": 2,
+                  "reps": 12,
+                  "rest": 0,
+                  "notes": "2 x 12 each foot. Band anchored lateral, pull foot inward, slow. Posterior tib / arch support."
+              },
+              {
+                  "id": "warmup-banded-glute-bridges",
+                  "name": "Warmup — Banded Glute Bridges",
+                  "sets": 1,
+                  "reps": 12,
+                  "rest": 0,
+                  "notes": "Slow. Band above knees. Drive knees out against band on way up."
+              },
+              {
+                  "id": "warmup-banded-lateral-walks",
+                  "name": "Warmup — Banded Lateral Walks",
+                  "sets": 2,
+                  "reps": 10,
+                  "rest": 0,
+                  "notes": "10 each direction. Heaviest band available. Slow and deliberate."
+              },
+              {
+                  "id": "warmup-leg-swings",
+                  "name": "Warmup — Leg Swings",
+                  "sets": 1,
+                  "reps": 10,
+                  "rest": 0,
+                  "notes": "10 front-to-back and 10 side-to-side, each leg."
+              },
+              {
+                  "id": "warmup-bw-squat-to-stand",
+                  "name": "Warmup — Bodyweight Squat to Stand",
+                  "sets": 1,
+                  "reps": 8,
+                  "rest": 0,
+                  "notes": "Reach floor at bottom, reach overhead at top."
+              },
+              {
+                  "id": "back-squat",
+                  "name": "Back Squat",
+                  "sets": 3,
+                  "reps": 8,
+                  "repsMin": 6,
+                  "weight": 135,
+                  "rest": 180,
+                  "restActivity": {
+                      "name": "Toe yoga",
+                      "prescription": "30 sec each foot, barefoot"
+                  },
+                  "notes": "RPE 7-8. High-bar, bar on traps, brace 360 each rep. Depth: comfortable. Knee long-resolved — sit into it; only cap depth if the anterior knee genuinely aches."
+              },
+              {
+                  "id": "romanian-deadlift",
+                  "name": "Romanian Deadlift",
+                  "sets": 3,
+                  "reps": 8,
+                  "weight": 145,
+                  "rest": 150,
+                  "restActivity": {
+                      "name": "90/90 hip switches",
+                      "prescription": "5 each direction"
+                  },
+                  "notes": "RPE 7-8. Slight knee bend, hinge from hips, bar travels along legs."
+              },
+              {
+                  "id": "atg-step-up",
+                  "name": "ATG Step-up",
+                  "sets": 3,
+                  "reps": 10,
+                  "repsMin": 8,
+                  "weight": 0,
+                  "rest": 90,
+                  "restActivity": {
+                      "name": "Ankle dorsiflexion mobilization",
+                      "prescription": "30 sec each side"
+                  },
+                  "notes": "RPE 7-8. 8-10 each leg. Start LOW box (6-8 in) bodyweight 2-3 weeks before going higher. Step up, lower with 3-sec eccentric, knee tracks over toes, full range. Working leg does the work. Hold rack for balance. Add light DBs only once BW is clean. Pain-free only — earn the height and load."
+              },
+              {
+                  "id": "leg-curl",
+                  "name": "Leg Curl",
+                  "sets": 3,
+                  "reps": 15,
+                  "repsMin": 12,
+                  "weight": 90,
+                  "rest": 90,
+                  "restActivity": {
+                      "name": "Couch stretch",
+                      "prescription": "30 sec each side"
+                  },
+                  "notes": "RPE 8. Control eccentric, 3 sec down."
+              },
+              {
+                  "id": "hip-abduction",
+                  "name": "Hip Abduction (machine or cable)",
+                  "sets": 3,
+                  "reps": 15,
+                  "repsMin": 12,
+                  "weight": 50,
+                  "rest": 60,
+                  "restActivity": {
+                      "name": "Dead bug or Pallof press",
+                      "prescription": "Dead bug 5 each side OR Pallof press 8 each side"
+                  },
+                  "notes": "RPE 8. Find weight in week 1. Slight forward lean to bias glute med over TFL. Glute med = knee protection + hip stability for running."
+              },
+              {
+                  "id": "seated-calf-raise",
+                  "name": "Seated Calf Raise",
+                  "sets": 3,
+                  "reps": 15,
+                  "repsMin": 12,
+                  "weight": 45,
+                  "rest": 60,
+                  "restActivity": {
+                      "name": "Standing hamstring stretch",
+                      "prescription": "30 sec each side"
+                  },
+                  "notes": "RPE 8-9. Bent-knee soleus work, critical with rising running mileage."
+              },
+              {
+                  "id": "single-leg-standing-heel-raise",
+                  "name": "Single-Leg Standing Heel Raise (PF-protective)",
+                  "sets": 2,
+                  "reps": 12,
+                  "repsMin": 10,
+                  "weight": 0,
+                  "rest": 60,
+                  "notes": "RPE 8. Toes dorsiflexed on a step edge. 3-sec eccentric, heavy + slow. Loads gastroc + plantar fascia."
+              },
+              {
+                  "id": "hanging-knee-raise",
+                  "name": "Hanging Knee Raise",
+                  "sets": 3,
+                  "reps": 15,
+                  "repsMin": 10,
+                  "weight": 0,
+                  "rest": 60,
+                  "notes": "RPE 8. Bodyweight. Slow and controlled, no swinging. Pause at top. Add ankle weights when 3 x 15 is easy. Direct anterior core work."
+              }
+          ]
+      },
+      {
+          "version": 1,
+          "id": "friday_upper_b",
+          "name": "Upper B (Pull)",
+          "unit": "lb",
+          "exercises": [
+              {
+                  "id": "warmup-bike-row",
+                  "name": "Warmup — Bike or Row",
+                  "sets": 1,
+                  "reps": 1,
+                  "rest": 0,
+                  "notes": "3 minutes easy."
+              },
+              {
+                  "id": "warmup-band-pull-aparts",
+                  "name": "Warmup — Band Pull-Aparts",
+                  "sets": 2,
+                  "reps": 15,
+                  "rest": 0,
+                  "notes": "Light band, squeeze at end range."
+              },
+              {
+                  "id": "warmup-band-external-rotations",
+                  "name": "Warmup — Band External Rotations",
+                  "sets": 2,
+                  "reps": 10,
+                  "rest": 0,
+                  "notes": "10 each side. Light band. Elbow glued to side."
+              },
+              {
+                  "id": "warmup-wall-slides",
+                  "name": "Warmup — Wall Slides",
+                  "sets": 1,
+                  "reps": 10,
+                  "rest": 0,
+                  "notes": "Back flat against wall, arms in goalpost position."
+              },
+              {
+                  "id": "warmup-tib-raises",
+                  "name": "Warmup — Tib Raises",
+                  "sets": 2,
+                  "reps": 15,
+                  "rest": 0,
+                  "notes": "Heels on floor, lift toes against wall or weight."
+              },
+              {
+                  "id": "warmup-cat-cow",
+                  "name": "Warmup — Cat-Cow",
+                  "sets": 1,
+                  "reps": 8,
+                  "rest": 0,
+                  "notes": "Slow, full range."
+              },
+              {
+                  "id": "warmup-scapular-pull-ups",
+                  "name": "Warmup — Scapular Pull-Ups",
+                  "sets": 1,
+                  "reps": 8,
+                  "rest": 0,
+                  "notes": "Hang, pull shoulder blades down and back without bending arms."
+              },
+              {
+                  "id": "dips",
+                  "name": "Dips",
+                  "sets": 4,
+                  "reps": 12,
+                  "repsMin": 8,
+                  "weight": 0,
+                  "rest": 120,
+                  "restActivity": {
+                      "name": "Thread the needle",
+                      "prescription": "5 each side"
+                  },
+                  "notes": "RPE 8. Week 1: test set BW to RPE 9, then prescribe. 8+ reps → 4x8-12 BW. 4-7 → 4x6-10 BW. 1-3 → assisted for 10. <1 → assisted for 8. Cues: slightly upright torso, controlled depth, no deep bottom stretch in early weeks. Lockout-position triceps."
+              },
+              {
+                  "id": "lat-pulldown",
+                  "name": "Lat Pulldown",
+                  "sets": 4,
+                  "reps": 12,
+                  "repsMin": 10,
+                  "weight": 105,
+                  "rest": 120,
+                  "restActivity": {
+                      "name": "Doorway pec stretch",
+                      "prescription": "30 sec each side"
+                  },
+                  "notes": "RPE 8. 105-110 lb. Verify per-handle vs total labeling. Lats = V-taper."
+              },
+              {
+                  "id": "cable-row",
+                  "name": "Cable Row",
+                  "sets": 3,
+                  "reps": 12,
+                  "repsMin": 10,
+                  "weight": 80,
+                  "rest": 90,
+                  "restActivity": {
+                      "name": "Open-book / T-spine extension",
+                      "prescription": "5 each side"
+                  },
+                  "notes": "RPE 8. Find RPE 8 weight in week 1. Back thickness + posture."
+              },
+              {
+                  "id": "lateral-raise-second-hit",
+                  "name": "Lateral Raise",
+                  "sets": 4,
+                  "reps": 15,
+                  "repsMin": 12,
+                  "weight": 10,
+                  "rest": 0,
+                  "notes": "RPE 9. Scapular plane, no shrug.",
+                  "supersetId": "lr-fp-finisher"
+              },
+              {
+                  "id": "face-pull",
+                  "name": "Face Pull",
+                  "sets": 4,
+                  "reps": 20,
+                  "repsMin": 15,
+                  "weight": 30,
+                  "rest": 60,
+                  "restActivity": {
+                      "name": "Wall pec/shoulder stretch",
+                      "prescription": "30 sec each side"
+                  },
+                  "notes": "RPE 8. Rope at face height, elbows high, pull to forehead + external-rotate at end, brief pause. Rear delt + posture. Light, quality over load.",
+                  "supersetId": "lr-fp-finisher"
+              },
+              {
+                  "id": "hammer-curl",
+                  "name": "Hammer Curl",
+                  "sets": 3,
+                  "reps": 12,
+                  "repsMin": 10,
+                  "weight": 25,
+                  "rest": 75,
+                  "notes": "RPE 8. Start 25 lb DBs. Brachialis / forearm thickness."
+              }
+          ]
+      }
+  ];
+
+  function seedDefaultsIfNeeded() {
+    if (store.get(K.defaultsSeeded)) return;
+    const lib = getLibrary();
+    let inserted = 0;
+    DEFAULT_WORKOUTS.forEach((w) => {
+      const errs = validateWorkout(w);
+      if (errs.length > 0) {
+        console.warn(`Default workout "${w.id}" failed validation, skipping:`, errs);
+        return;
+      }
+      if (!lib[w.id]) { lib[w.id] = w; inserted++; }
+    });
+    if (inserted > 0) setLibrary(lib);
+    store.set(K.defaultsSeeded, true);
+  }
+
+  function restoreDefaults() {
+    const lib = getLibrary();
+    let added = 0;
+    DEFAULT_WORKOUTS.forEach((w) => {
+      const errs = validateWorkout(w);
+      if (errs.length > 0) return;
+      if (!lib[w.id]) { lib[w.id] = w; added++; }
+    });
+    if (added > 0) setLibrary(lib);
+    return added;
+  }
+
   /* ─────────── BOOT ─────────── */
   function boot() {
     // Skip full boot if no app DOM is present (e.g. running from the test page).
@@ -1026,6 +1705,10 @@
 
     // Initialize schema if missing
     if (store.get(K.schema) == null) store.set(K.schema, SCHEMA);
+
+    // First-launch seeding: drop the bundled workouts into an empty library.
+    // Idempotent — re-running boot won't duplicate or undo user deletions.
+    seedDefaultsIfNeeded();
 
     wire();
     requestStoragePersist();
