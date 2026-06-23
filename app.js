@@ -8,7 +8,7 @@
   'use strict';
 
   /* ─────────── CONST ─────────── */
-  const APP_VERSION = '1.6.0';
+  const APP_VERSION = '1.7.0';
   const SCHEMA = 1;
   const ONE_DAY = 86_400_000;
   const BACKUP_NAG_AFTER_MS = 30 * ONE_DAY;
@@ -1039,6 +1039,20 @@
         renderSettings();
         break;
       }
+      case 'reset-defaults': {
+        const out = document.querySelector('[data-field="defaults-output"]');
+        const active = getActive();
+        if (active && !active.finishedAt) {
+          out.textContent = 'You have a workout in progress. End it before resetting defaults.';
+          break;
+        }
+        openConfirm('Replace your default workouts with the latest bundled versions? Any edits you made to them will be lost.', () => {
+          const count = resetDefaults();
+          out.textContent = `Updated ${count} default workout${count === 1 ? '' : 's'} to the bundled version.`;
+          renderSettings();
+        });
+        break;
+      }
 
       // Settings — import workout
       case 'import-workout-validate': importWorkoutValidate(); break;
@@ -1186,96 +1200,20 @@
   // Bundled workouts seeded into the library on first launch. The user can
   // delete any of them without them returning; Settings → Restore defaults
   // re-adds any that are missing without touching the rest of the library.
-  const DEFAULT_WORKOUTS = [
+  const DEFAULT_WORKOUTS =   [
       {
           "version": 1,
           "id": "monday_upper_a",
-          "name": "Upper A (Push)",
+          "name": "Upper A",
           "unit": "lb",
           "exercises": [
               {
-                  "id": "warmup-bike-row",
-                  "name": "Warmup — Bike or Row",
-                  "sets": 1,
-                  "reps": 1,
-                  "rest": 0,
-                  "notes": "3 minutes easy."
-              },
-              {
                   "id": "warmup-band-pull-aparts",
-                  "name": "Warmup — Band Pull-Aparts",
-                  "sets": 2,
+                  "name": "Warmup — Band Pull-Aparts + Feeler",
+                  "sets": 1,
                   "reps": 15,
                   "rest": 0,
-                  "notes": "Light band, squeeze at end range."
-              },
-              {
-                  "id": "warmup-band-external-rotations",
-                  "name": "Warmup — Band External Rotations",
-                  "sets": 2,
-                  "reps": 10,
-                  "rest": 0,
-                  "notes": "10 each side. Light band. Elbow glued to side."
-              },
-              {
-                  "id": "warmup-wall-slides",
-                  "name": "Warmup — Wall Slides",
-                  "sets": 1,
-                  "reps": 10,
-                  "rest": 0,
-                  "notes": "Back flat against wall, arms in goalpost position."
-              },
-              {
-                  "id": "warmup-tib-raises",
-                  "name": "Warmup — Tib Raises",
-                  "sets": 2,
-                  "reps": 15,
-                  "rest": 0,
-                  "notes": "Heels on floor, lift toes against wall or weight."
-              },
-              {
-                  "id": "warmup-cat-cow",
-                  "name": "Warmup — Cat-Cow",
-                  "sets": 1,
-                  "reps": 8,
-                  "rest": 0,
-                  "notes": "Slow, full range, breathe with it."
-              },
-              {
-                  "id": "warmup-scapular-pull-ups",
-                  "name": "Warmup — Scapular Pull-Ups",
-                  "sets": 1,
-                  "reps": 8,
-                  "rest": 0,
-                  "notes": "Hang, pull shoulder blades down and back without bending arms."
-              },
-              {
-                  "id": "incline-db-press",
-                  "name": "Incline DB Press",
-                  "sets": 4,
-                  "reps": 8,
-                  "repsMin": 6,
-                  "weight": 45,
-                  "rest": 180,
-                  "restActivity": {
-                      "name": "Neck CARs",
-                      "prescription": "1 slow circle each direction"
-                  },
-                  "notes": "RPE 7-8. 30-45 degree bench. 45s, or 40s if 45s feel like RPE 9."
-              },
-              {
-                  "id": "pull-up",
-                  "name": "Pull-up",
-                  "sets": 4,
-                  "reps": 8,
-                  "repsMin": 6,
-                  "weight": 0,
-                  "rest": 180,
-                  "restActivity": {
-                      "name": "Doorway pec stretch",
-                      "prescription": "30 sec each side"
-                  },
-                  "notes": "RPE 8. Weighted if possible, assisted if needed. Find weight or assist for 8 clean reps. Goal: 3-5 strict unassisted by week 8."
+                  "notes": "The run was your warmup. ~90 sec band pull-aparts, then one lighter feeler set before the first lift."
               },
               {
                   "id": "standing-db-ohp",
@@ -1283,27 +1221,29 @@
                   "sets": 3,
                   "reps": 8,
                   "repsMin": 6,
-                  "weight": 35,
+                  "weight": 30,
                   "rest": 150,
-                  "restActivity": {
-                      "name": "Open-book / T-spine extension",
-                      "prescription": "5 each side"
-                  },
-                  "notes": "RPE 7-8. 35 lb DBs to start, find RPE 7-8. Strict, no leg drive, ribs down. Lumbar arch = first sign too heavy → drop weight or move to seated DB."
+                  "notes": "RPE 7-8. Strict, ribs down, no leg drive. Low-back arch = first sign too heavy → drop a notch."
               },
               {
-                  "id": "chest-supported-row",
-                  "name": "Chest-Supported Row",
+                  "id": "dips",
+                  "name": "Dips",
                   "sets": 3,
-                  "reps": 10,
+                  "reps": 12,
                   "repsMin": 8,
-                  "weight": 70,
-                  "rest": 120,
-                  "restActivity": {
-                      "name": "Thread the needle",
-                      "prescription": "5 each side"
-                  },
-                  "notes": "RPE 7-8. Squeeze 1 sec at contraction, control negative. Find RPE 7 weight in week 1."
+                  "weight": 0,
+                  "rest": 150,
+                  "notes": "RPE 8. Week 1: test set BW to RPE 9, then prescribe. Slightly upright torso, controlled depth. Triceps + chest."
+              },
+              {
+                  "id": "pull-up",
+                  "name": "Pull-up",
+                  "sets": 3,
+                  "reps": 8,
+                  "repsMin": 6,
+                  "weight": 0,
+                  "rest": 150,
+                  "notes": "RPE 8. Assist for 8 clean if needed; weighted if 8 clean BW. Vertical pull #1 — V-taper width. Goal: a few strict unassisted by week 8."
               },
               {
                   "id": "lateral-raise",
@@ -1312,49 +1252,27 @@
                   "reps": 15,
                   "repsMin": 12,
                   "weight": 10,
-                  "rest": 60,
-                  "restActivity": {
-                      "name": "Wall pec/shoulder stretch",
-                      "prescription": "30 sec each side"
-                  },
-                  "notes": "RPE 9. Scapular plane, slight pour, no upper-trap shrug. Top isolation priority."
+                  "rest": 0,
+                  "notes": "RPE 9. TOP PRIORITY. Scapular plane, slight pour, no upper-trap shrug.",
+                  "supersetId": "lr-fp-finisher"
               },
               {
-                  "id": "overhead-tricep-extension",
-                  "name": "Overhead Tricep Extension",
-                  "sets": 2,
-                  "reps": 12,
-                  "repsMin": 10,
-                  "weight": 40,
+                  "id": "face-pull",
+                  "name": "Face Pull",
+                  "sets": 4,
+                  "reps": 20,
+                  "repsMin": 15,
+                  "weight": 50,
                   "rest": 60,
-                  "notes": "RPE 8. Rope from low cable or single-arm DB. Arm overhead, stretch long head at bottom, control eccentric."
-              },
-              {
-                  "id": "supinating-curl",
-                  "name": "Supinating Curl",
-                  "sets": 3,
-                  "reps": 12,
-                  "repsMin": 10,
-                  "weight": 25,
-                  "rest": 60,
-                  "notes": "RPE 8. Incline DB or EZ-bar. Short-head / peak bias. Start 25 lb DBs or find RPE 8."
-              },
-              {
-                  "id": "tricep-pushdown",
-                  "name": "Tricep Pushdown",
-                  "sets": 2,
-                  "reps": 15,
-                  "repsMin": 12,
-                  "weight": 45,
-                  "rest": 60,
-                  "notes": "RPE 8-9. Start 45 lb (new gym pulley ratio — not 75). Hits lockout/contracted position; complements Mon overhead extension (stretched position)."
+                  "notes": "RPE 8. Rope at face height, elbows high, pull to forehead + external-rotate, brief pause. Rear delt + posture. Light, quality over load.",
+                  "supersetId": "lr-fp-finisher"
               }
           ]
       },
       {
           "version": 1,
           "id": "wednesday_lower_strength",
-          "name": "Lower Strength",
+          "name": "Leg Day",
           "unit": "lb",
           "exercises": [
               {
@@ -1366,14 +1284,6 @@
                   "notes": "3 minutes easy spin."
               },
               {
-                  "id": "warmup-calf-raise-toe-spread",
-                  "name": "Warmup — Calf Raise + Toe Spread",
-                  "sets": 2,
-                  "reps": 15,
-                  "rest": 0,
-                  "notes": "Barefoot. Slow calf raises with conscious toe spread at top and bottom. 2 x 15 each foot."
-              },
-              {
                   "id": "warmup-tib-raises",
                   "name": "Warmup — Tib Raises",
                   "sets": 2,
@@ -1382,113 +1292,42 @@
                   "notes": "Heels on floor, lift toes against wall or weight. Anterior tibialis."
               },
               {
-                  "id": "warmup-resisted-ankle-inversion",
-                  "name": "Warmup — Resisted Ankle Inversion",
-                  "sets": 2,
-                  "reps": 12,
-                  "rest": 0,
-                  "notes": "2 x 12 each foot. Band anchored lateral, pull foot inward, slow. Posterior tib / arch support."
-              },
-              {
-                  "id": "warmup-banded-glute-bridges",
-                  "name": "Warmup — Banded Glute Bridges",
-                  "sets": 1,
-                  "reps": 12,
-                  "rest": 0,
-                  "notes": "Slow. Band above knees. Drive knees out against band on way up."
-              },
-              {
                   "id": "warmup-banded-lateral-walks",
                   "name": "Warmup — Banded Lateral Walks",
                   "sets": 2,
                   "reps": 10,
                   "rest": 0,
-                  "notes": "10 each direction. Heaviest band available. Slow and deliberate."
+                  "notes": "10 each direction. Heaviest band available. Plus a couple of ramp-up sets on the first lift."
               },
               {
-                  "id": "warmup-leg-swings",
-                  "name": "Warmup — Leg Swings",
-                  "sets": 1,
-                  "reps": 10,
-                  "rest": 0,
-                  "notes": "10 front-to-back and 10 side-to-side, each leg."
-              },
-              {
-                  "id": "warmup-bw-squat-to-stand",
-                  "name": "Warmup — Bodyweight Squat to Stand",
-                  "sets": 1,
-                  "reps": 8,
-                  "rest": 0,
-                  "notes": "Reach floor at bottom, reach overhead at top."
-              },
-              {
-                  "id": "back-squat",
-                  "name": "Back Squat",
+                  "id": "leg-press",
+                  "name": "Leg Press",
                   "sets": 3,
-                  "reps": 8,
-                  "repsMin": 6,
-                  "weight": 135,
+                  "reps": 12,
+                  "repsMin": 10,
+                  "weight": 200,
                   "rest": 180,
-                  "restActivity": {
-                      "name": "Toe yoga",
-                      "prescription": "30 sec each foot, barefoot"
-                  },
-                  "notes": "RPE 7-8. High-bar, bar on traps, brace 360 each rep. Depth: comfortable. Knee long-resolved — sit into it; only cap depth if the anterior knee genuinely aches."
+                  "notes": "Find RPE 7 on set 1. Quad base — load it hard without taxing your spine or your running."
               },
               {
-                  "id": "romanian-deadlift",
-                  "name": "Romanian Deadlift",
-                  "sets": 3,
-                  "reps": 8,
-                  "weight": 145,
-                  "rest": 150,
-                  "restActivity": {
-                      "name": "90/90 hip switches",
-                      "prescription": "5 each direction"
-                  },
-                  "notes": "RPE 7-8. Slight knee bend, hinge from hips, bar travels along legs."
-              },
-              {
-                  "id": "atg-step-up",
-                  "name": "ATG Step-up",
-                  "sets": 3,
-                  "reps": 10,
-                  "repsMin": 8,
-                  "weight": 0,
-                  "rest": 90,
-                  "restActivity": {
-                      "name": "Ankle dorsiflexion mobilization",
-                      "prescription": "30 sec each side"
-                  },
-                  "notes": "RPE 7-8. 8-10 each leg. Start LOW box (6-8 in) bodyweight 2-3 weeks before going higher. Step up, lower with 3-sec eccentric, knee tracks over toes, full range. Working leg does the work. Hold rack for balance. Add light DBs only once BW is clean. Pain-free only — earn the height and load."
-              },
-              {
-                  "id": "leg-curl",
-                  "name": "Leg Curl",
+                  "id": "leg-extension",
+                  "name": "Leg Extension",
                   "sets": 3,
                   "reps": 15,
                   "repsMin": 12,
-                  "weight": 90,
+                  "weight": 80,
                   "rest": 90,
-                  "restActivity": {
-                      "name": "Couch stretch",
-                      "prescription": "30 sec each side"
-                  },
-                  "notes": "RPE 8. Control eccentric, 3 sec down."
+                  "notes": "Find RPE 7-8. Quad line — builds the rectus femoris, which leg press and squats barely touch. Lean the seat back (less hip angle) to bias it harder. Controlled, full range."
               },
               {
                   "id": "hip-abduction",
-                  "name": "Hip Abduction (machine or cable)",
+                  "name": "Hip Abduction",
                   "sets": 3,
                   "reps": 15,
                   "repsMin": 12,
                   "weight": 50,
                   "rest": 60,
-                  "restActivity": {
-                      "name": "Dead bug or Pallof press",
-                      "prescription": "Dead bug 5 each side OR Pallof press 8 each side"
-                  },
-                  "notes": "RPE 8. Find weight in week 1. Slight forward lean to bias glute med over TFL. Glute med = knee protection + hip stability for running."
+                  "notes": "RPE 8. Slight forward lean to bias glute med over TFL. Glute med = knee protection + hip stability for running."
               },
               {
                   "id": "seated-calf-raise",
@@ -1498,163 +1337,63 @@
                   "repsMin": 12,
                   "weight": 45,
                   "rest": 60,
-                  "restActivity": {
-                      "name": "Standing hamstring stretch",
-                      "prescription": "30 sec each side"
-                  },
-                  "notes": "RPE 8-9. Bent-knee soleus work, critical with rising running mileage."
+                  "notes": "RPE 8-9. Soleus — the running workhorse. Critical with rising mileage."
               },
               {
-                  "id": "single-leg-standing-heel-raise",
-                  "name": "Single-Leg Standing Heel Raise (PF-protective)",
+                  "id": "single-leg-heel-raise",
+                  "name": "Single-Leg Heel Raise",
                   "sets": 2,
                   "reps": 12,
                   "repsMin": 10,
                   "weight": 0,
                   "rest": 60,
-                  "notes": "RPE 8. Toes dorsiflexed on a step edge. 3-sec eccentric, heavy + slow. Loads gastroc + plantar fascia."
-              },
-              {
-                  "id": "hanging-knee-raise",
-                  "name": "Hanging Knee Raise",
-                  "sets": 3,
-                  "reps": 15,
-                  "repsMin": 10,
-                  "weight": 0,
-                  "rest": 60,
-                  "notes": "RPE 8. Bodyweight. Slow and controlled, no swinging. Pause at top. Add ankle weights when 3 x 15 is easy. Direct anterior core work."
+                  "notes": "RPE 8. Rolled towel under the toes (loads the fascia). 3-sec up / 2-sec hold / 3-sec down. Add load by holding a DB or wearing a loaded pack once BW is easy."
               }
           ]
       },
       {
           "version": 1,
           "id": "friday_upper_b",
-          "name": "Upper B (Pull)",
+          "name": "Upper B",
           "unit": "lb",
           "exercises": [
               {
-                  "id": "warmup-bike-row",
-                  "name": "Warmup — Bike or Row",
-                  "sets": 1,
-                  "reps": 1,
-                  "rest": 0,
-                  "notes": "3 minutes easy."
-              },
-              {
                   "id": "warmup-band-pull-aparts",
-                  "name": "Warmup — Band Pull-Aparts",
-                  "sets": 2,
+                  "name": "Warmup — Band Pull-Aparts + Feeler",
+                  "sets": 1,
                   "reps": 15,
                   "rest": 0,
-                  "notes": "Light band, squeeze at end range."
-              },
-              {
-                  "id": "warmup-band-external-rotations",
-                  "name": "Warmup — Band External Rotations",
-                  "sets": 2,
-                  "reps": 10,
-                  "rest": 0,
-                  "notes": "10 each side. Light band. Elbow glued to side."
-              },
-              {
-                  "id": "warmup-wall-slides",
-                  "name": "Warmup — Wall Slides",
-                  "sets": 1,
-                  "reps": 10,
-                  "rest": 0,
-                  "notes": "Back flat against wall, arms in goalpost position."
-              },
-              {
-                  "id": "warmup-tib-raises",
-                  "name": "Warmup — Tib Raises",
-                  "sets": 2,
-                  "reps": 15,
-                  "rest": 0,
-                  "notes": "Heels on floor, lift toes against wall or weight."
-              },
-              {
-                  "id": "warmup-cat-cow",
-                  "name": "Warmup — Cat-Cow",
-                  "sets": 1,
-                  "reps": 8,
-                  "rest": 0,
-                  "notes": "Slow, full range."
-              },
-              {
-                  "id": "warmup-scapular-pull-ups",
-                  "name": "Warmup — Scapular Pull-Ups",
-                  "sets": 1,
-                  "reps": 8,
-                  "rest": 0,
-                  "notes": "Hang, pull shoulder blades down and back without bending arms."
-              },
-              {
-                  "id": "dips",
-                  "name": "Dips",
-                  "sets": 4,
-                  "reps": 12,
-                  "repsMin": 8,
-                  "weight": 0,
-                  "rest": 120,
-                  "restActivity": {
-                      "name": "Thread the needle",
-                      "prescription": "5 each side"
-                  },
-                  "notes": "RPE 8. Week 1: test set BW to RPE 9, then prescribe. 8+ reps → 4x8-12 BW. 4-7 → 4x6-10 BW. 1-3 → assisted for 10. <1 → assisted for 8. Cues: slightly upright torso, controlled depth, no deep bottom stretch in early weeks. Lockout-position triceps."
+                  "notes": "The run was your warmup. ~90 sec band pull-aparts, then one lighter feeler set before the first lift."
               },
               {
                   "id": "lat-pulldown",
                   "name": "Lat Pulldown",
-                  "sets": 4,
-                  "reps": 12,
-                  "repsMin": 10,
-                  "weight": 105,
-                  "rest": 120,
-                  "restActivity": {
-                      "name": "Doorway pec stretch",
-                      "prescription": "30 sec each side"
-                  },
-                  "notes": "RPE 8. 105-110 lb. Verify per-handle vs total labeling. Lats = V-taper."
-              },
-              {
-                  "id": "cable-row",
-                  "name": "Cable Row",
                   "sets": 3,
                   "reps": 12,
                   "repsMin": 10,
-                  "weight": 80,
-                  "rest": 90,
-                  "restActivity": {
-                      "name": "Open-book / T-spine extension",
-                      "prescription": "5 each side"
-                  },
-                  "notes": "RPE 8. Find RPE 8 weight in week 1. Back thickness + posture."
+                  "weight": 90,
+                  "rest": 120,
+                  "notes": "RPE 8. Vertical pull #2 — lat width on its own day so the V-taper gets trained twice a week."
               },
               {
-                  "id": "lateral-raise-second-hit",
+                  "id": "chest-supported-row",
+                  "name": "Chest-Supported / Cable Row",
+                  "sets": 3,
+                  "reps": 10,
+                  "repsMin": 8,
+                  "weight": 90,
+                  "rest": 90,
+                  "notes": "RPE 7-8. Squeeze 1 sec at contraction, control negative. Back thickness + posture."
+              },
+              {
+                  "id": "lateral-raise",
                   "name": "Lateral Raise",
                   "sets": 4,
                   "reps": 15,
                   "repsMin": 12,
                   "weight": 10,
-                  "rest": 0,
-                  "notes": "RPE 9. Scapular plane, no shrug.",
-                  "supersetId": "lr-fp-finisher"
-              },
-              {
-                  "id": "face-pull",
-                  "name": "Face Pull",
-                  "sets": 4,
-                  "reps": 20,
-                  "repsMin": 15,
-                  "weight": 30,
                   "rest": 60,
-                  "restActivity": {
-                      "name": "Wall pec/shoulder stretch",
-                      "prescription": "30 sec each side"
-                  },
-                  "notes": "RPE 8. Rope at face height, elbows high, pull to forehead + external-rotate at end, brief pause. Rear delt + posture. Light, quality over load.",
-                  "supersetId": "lr-fp-finisher"
+                  "notes": "RPE 9. Second weekly hit — side delts recover fast and want the frequency. Scapular plane, no upper-trap shrug."
               },
               {
                   "id": "hammer-curl",
@@ -1663,8 +1402,18 @@
                   "reps": 12,
                   "repsMin": 10,
                   "weight": 25,
-                  "rest": 75,
-                  "notes": "RPE 8. Start 25 lb DBs. Brachialis / forearm thickness."
+                  "rest": 60,
+                  "notes": "RPE 8. Biceps + brachialis — a fuller-looking arm. Swap to a supinating curl for more peak bias."
+              },
+              {
+                  "id": "overhead-cable-triceps-extension",
+                  "name": "Overhead Cable Triceps Extension",
+                  "sets": 3,
+                  "reps": 12,
+                  "repsMin": 10,
+                  "weight": 30,
+                  "rest": 60,
+                  "notes": "RPE 8. ~25-30 lb to start, find RPE 8. Rope from low cable, arm overhead, stretch long head at bottom, control eccentric. The part dips don't reach."
               }
           ]
       }
@@ -1696,6 +1445,22 @@
     });
     if (added > 0) setLibrary(lib);
     return added;
+  }
+
+  // Force-overwrite the 3 default ids with the bundled versions, replacing
+  // any customizations the user made under those ids. Skips ids not currently
+  // in the library — use restoreDefaults() to add those.
+  function resetDefaults() {
+    const lib = getLibrary();
+    let updated = 0;
+    DEFAULT_WORKOUTS.forEach((w) => {
+      const errs = validateWorkout(w);
+      if (errs.length > 0) return;
+      lib[w.id] = w;
+      updated++;
+    });
+    if (updated > 0) setLibrary(lib);
+    return updated;
   }
 
   /* ─────────── BOOT ─────────── */
