@@ -2,7 +2,7 @@
  * Cache-first for the app shell; network-first for the SW itself (handled by
  * Cache-Control headers on the host). Bump CACHE_VERSION to force a refresh.
  */
-const CACHE_VERSION = 'workout-v9';
+const CACHE_VERSION = 'workout-v10';
 const SHELL = [
   './',
   './index.html',

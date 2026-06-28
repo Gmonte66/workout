@@ -8,10 +8,14 @@
   'use strict';
 
   /* ─────────── CONST ─────────── */
-  const APP_VERSION = '1.7.0';
+  const APP_VERSION = '1.7.1';
   const SCHEMA = 1;
   const ONE_DAY = 86_400_000;
   const BACKUP_NAG_AFTER_MS = 30 * ONE_DAY;
+  // Buffer for "getting to my phone" — rest screen fires earlier than the
+  // JSON's `rest` value so I'm ready to start the next set on time. Only
+  // applied when rest > offset, so a deliberately-short rest isn't clamped.
+  const REST_PRE_FIRE_OFFSET = 10;
 
   const K = {
     library: 'workout.library',
@@ -730,8 +734,9 @@
       restSourceId = ex.id;
     }
     const restSec = restEx && restEx.rest && restEx.rest > 0 ? restEx.rest : 0;
-    if (restSec > 0) {
-      active.restEndsAt = Date.now() + restSec * 1000;
+    const effectiveSec = restSec > REST_PRE_FIRE_OFFSET ? restSec - REST_PRE_FIRE_OFFSET : restSec;
+    if (effectiveSec > 0) {
+      active.restEndsAt = Date.now() + effectiveSec * 1000;
       active.restActivitySourceId = restSourceId;
       setActive(active);
       show('rest');
@@ -857,8 +862,11 @@
   }
 
   function keypadSave() {
-    const raw = keypadState.buffer;
-    if (raw === '' || raw === '.') { closeKeypad(); return; }
+    // Empty buffer collapses to "0" — the display already reads "0" via the
+    // `buffer || '0'` fallback, so saving 0 is what the user visually expects.
+    // For reps the downstream `num <= 0` check still rejects it.
+    const raw = keypadState.buffer === '' ? '0' : keypadState.buffer;
+    if (raw === '.') { closeKeypad(); return; }
     const num = Number(raw);
     if (!Number.isFinite(num) || num < 0) { closeKeypad(); return; }
     if (keypadState.target === 'reps') {
